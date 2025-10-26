@@ -273,9 +273,9 @@ class EventViewSet(viewsets.ModelViewSet):
             if video:
                 serializer = HeroVideoSerializer(video)
                 return Response(serializer.data)
-            return Response({'video_url': '/videos/partyoria-bg.mp4'})
+            return Response({'video_url': '/videos/party-hero.mp4'})
         except Exception as e:
-            return Response({'video_url': '/videos/partyoria-bg.mp4'})
+            return Response({'video_url': '/videos/party-hero.mp4'})
 
 
     

@@ -33,7 +33,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
   const [apiSections, setApiSections] = useState<ApiSection[]>([]);
   const [apiImages, setApiImages] = useState<Record<string, string>>({});
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [heroVideoUrl, setHeroVideoUrl] = useState('/videos/partyoria-bg.mp4');
+  const [heroVideoUrl, setHeroVideoUrl] = useState('/videos/party-hero.mp4');
 
 
   useEffect(() => {

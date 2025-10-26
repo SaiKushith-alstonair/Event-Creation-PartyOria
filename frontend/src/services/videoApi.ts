@@ -10,6 +10,6 @@ export const getHeroVideo = async () => {
     return data.video_url;
   } catch (error) {
     console.warn('Failed to fetch hero video from API, using fallback:', error);
-    return '/videos/partyoria-bg.mp4';
+    return '/videos/party-hero.mp4';
   }
 };
