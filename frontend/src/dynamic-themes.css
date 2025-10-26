@@ -1,0 +1,220 @@
+/* Dynamic Event Theming CSS */
+:root {
+  --theme-bg: #fff9c4;
+  --theme-accent1: #ff69b4;
+  --theme-accent2: #ffd700;
+  --theme-accent3: #87ceeb;
+  --theme-border: #ff69b4;
+  --theme-primary: #c9a0a0;
+  --theme-button-dark: #a67c00;
+  --theme-button-hover: #b8941a;
+}
+
+/* Smooth transitions for theme changes */
+body,
+.decor-dot,
+.dashed-circle,
+.section-heading,
+.form-field,
+.continue-btn,
+.previous-btn,
+.icon-circle {
+  transition: all 0.3s ease;
+}
+
+/* Background theming */
+body {
+  background-color: var(--theme-bg);
+}
+
+/* Left side decorative elements */
+.decor-dot1 {
+  background-color: var(--theme-accent1);
+}
+
+.decor-dot2 {
+  background-color: var(--theme-accent2);
+}
+
+.decor-dot3 {
+  background-color: var(--theme-accent3);
+}
+
+.dashed-circle {
+  border-color: var(--theme-border);
+  border-style: dashed;
+}
+
+.section-heading {
+  color: var(--theme-primary);
+}
+
+.underline-text {
+  border-bottom-color: var(--theme-border);
+}
+
+/* Icon tinting */
+.house-icon {
+  filter: hue-rotate(0deg) saturate(1) brightness(1);
+}
+
+.bottom-icon-circle {
+  background-color: var(--theme-accent1);
+}
+
+.bottom-icon-circle:nth-child(2) {
+  background-color: var(--theme-accent2);
+}
+
+.bottom-icon-circle:nth-child(3) {
+  background-color: var(--theme-accent3);
+}
+
+/* Right side form elements */
+.form-heading {
+  color: var(--theme-primary);
+}
+
+.form-field {
+  border-color: var(--theme-border);
+}
+
+.form-field:focus {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 2px rgba(var(--theme-primary-rgb), 0.2);
+}
+
+.form-label {
+  color: var(--theme-primary);
+}
+
+/* Button styling */
+.continue-btn {
+  background-color: var(--theme-button-dark);
+  border-color: var(--theme-button-dark);
+}
+
+.continue-btn:hover {
+  background-color: var(--theme-button-hover);
+  border-color: var(--theme-button-hover);
+}
+
+.previous-btn {
+  border-color: var(--theme-button-dark);
+  color: var(--theme-button-dark);
+}
+
+.previous-btn:hover {
+  background-color: var(--theme-button-hover);
+  color: white;
+}
+
+/* Theme-specific classes for each event type */
+.theme-wedding {
+  --theme-bg: #fce7f3;
+  --theme-accent1: #ec4899;
+  --theme-accent2: #f472b6;
+  --theme-accent3: #be185d;
+  --theme-border: #ec4899;
+  --theme-primary: #be185d;
+  --theme-button-dark: #9d174d;
+}
+
+.theme-conference {
+  --theme-bg: #dbeafe;
+  --theme-accent1: #2563eb;
+  --theme-accent2: #60a5fa;
+  --theme-accent3: #1d4ed8;
+  --theme-border: #2563eb;
+  --theme-primary: #1d4ed8;
+  --theme-button-dark: #1e40af;
+}
+
+.theme-birthday {
+  --theme-bg: #fef3c7;
+  --theme-accent1: #f59e0b;
+  --theme-accent2: #fbbf24;
+  --theme-accent3: #d97706;
+  --theme-border: #f59e0b;
+  --theme-primary: #d97706;
+  --theme-button-dark: #b45309;
+}
+
+.theme-corporate-party {
+  --theme-bg: #fef3c7;
+  --theme-accent1: #f59e0b;
+  --theme-accent2: #fbbf24;
+  --theme-accent3: #d97706;
+  --theme-border: #f59e0b;
+  --theme-primary: #d97706;
+  --theme-button-dark: #b45309;
+}
+
+.theme-diwali-celebration {
+  --theme-bg: #fed7aa;
+  --theme-accent1: #ea580c;
+  --theme-accent2: #f97316;
+  --theme-accent3: #c2410c;
+  --theme-border: #ea580c;
+  --theme-primary: #c2410c;
+  --theme-button-dark: #9a3412;
+}
+
+.theme-sports-tournament {
+  --theme-bg: #dbeafe;
+  --theme-accent1: #2563eb;
+  --theme-accent2: #60a5fa;
+  --theme-accent3: #1d4ed8;
+  --theme-border: #2563eb;
+  --theme-primary: #1d4ed8;
+  --theme-button-dark: #1e40af;
+}
+
+.theme-sports-day {
+  --theme-bg: #f3e8ff;
+  --theme-accent1: #a855f7;
+  --theme-accent2: #c084fc;
+  --theme-accent3: #7c3aed;
+  --theme-border: #a855f7;
+  --theme-primary: #7c3aed;
+  --theme-button-dark: #6d28d9;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .decor-dot {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .dashed-circle {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+/* Accessibility - ensure contrast ratios */
+@media (prefers-contrast: high) {
+  .form-field {
+    border-width: 2px;
+  }
+  
+  .continue-btn,
+  .previous-btn {
+    border-width: 2px;
+    font-weight: bold;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background-color: white !important;
+  }
+  
+  .decor-dot,
+  .dashed-circle {
+    border-color: black !important;
+    background-color: white !important;
+  }
+}
