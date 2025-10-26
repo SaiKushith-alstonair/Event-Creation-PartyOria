@@ -207,7 +207,48 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
             </button>
           )}
         </div>
-        <span className="text-sm text-gray-500">{filteredAndSortedEvents.length} events</span>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-sm text-gray-500">{filteredAndSortedEvents.length} events</div>
+            <div className="text-xs text-gray-400">
+              Total Budget: ₹{filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-r from-purple-100 to-purple-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-purple-700">{filteredAndSortedEvents.length}</div>
+          <div className="text-sm text-purple-600">Total Events</div>
+        </div>
+        <div className="bg-gradient-to-r from-blue-100 to-blue-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-700">
+            {filteredAndSortedEvents.reduce((sum, event) => sum + (event.attendees || 0), 0).toLocaleString()}
+          </div>
+          <div className="text-sm text-blue-600">Total Guests</div>
+        </div>
+        <div className="bg-gradient-to-r from-green-100 to-green-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-700">
+            ₹{(filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0) / 100000).toFixed(1)}L
+          </div>
+          <div className="text-sm text-green-600">Total Budget</div>
+        </div>
+        <div className="bg-gradient-to-r from-orange-100 to-orange-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-orange-700">
+            {(() => {
+              const totalVendors = filteredAndSortedEvents.reduce((sum, event) => {
+                const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                const selectedServices = apiEvent?.selected_services;
+                const vendorServices = apiEvent?.form_data?.selectedVendorServices;
+                return sum + (selectedServices?.length || vendorServices?.length || 0);
+              }, 0);
+              return totalVendors;
+            })()}
+          </div>
+          <div className="text-sm text-orange-600">Total Vendors</div>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -268,7 +309,7 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredAndSortedEvents.map((event, index) => {
           const eventType = event.eventName.toLowerCase().includes('wedding') ? 'social' :
                           event.eventName.toLowerCase().includes('conference') ? 'corporate' :
@@ -280,14 +321,10 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
           return (
             <div 
               key={event.id}
-              onClick={() => {
-                setSelectedEventId(event.id);
-                setShowDetailsModal(true);
-              }}
-              className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-300 hover:border-purple-400 hover:shadow-xl transition-all duration-200 cursor-pointer group interactive-card"
+              className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-300 hover:border-purple-400 hover:shadow-xl transition-all duration-200 group interactive-card"
             >
               {/* Event Image Placeholder */}
-              <div className="h-48 bg-gradient-to-br from-purple-200 to-pink-300 relative overflow-hidden rounded-t-xl">
+              <div className="h-40 bg-gradient-to-br from-purple-200 to-pink-300 relative overflow-hidden rounded-t-xl">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-4xl opacity-50">
                     {eventType === 'social' ? '💍' : 
@@ -331,54 +368,118 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                   <h3 className="text-xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
                     {event.eventName}
                   </h3>
-                  <p className="text-2xl font-bold text-purple-600">
-                    ₹{event.budget?.toLocaleString() || '0'}
-                  </p>
-                </div>
-
-                {/* Client and Vendor Count */}
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">Client:</span> {event.clientName}
-                  </p>
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Users size={14} />
-                      {event.attendees || 0} guests
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <p className="text-2xl font-bold text-purple-600">
+                      ₹{event.budget?.toLocaleString() || '0'}
+                    </p>
                     {(() => {
                       const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                      const selectedServices = apiEvent?.selected_services;
-                      const vendorServices = apiEvent?.form_data?.selectedVendorServices;
-                      const serviceCount = selectedServices?.length || vendorServices?.length || 0;
-                      
+                      const eventType = apiEvent?.form_data?.event_type || 'general';
+                      const subType = apiEvent?.form_data?.sub_type || 'event';
                       return (
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
-                          {serviceCount} vendors
+                        <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                          {subType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </span>
                       );
                     })()}
                   </div>
                 </div>
 
+                {/* Client Information */}
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Client:</span>
+                    <span className="text-sm text-gray-900 font-medium">{event.clientName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Contact:</span>
+                    <span className="text-sm text-gray-600">{event.clientPhone}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Email:</span>
+                    <span className="text-sm text-gray-600 truncate max-w-32">{event.clientEmail}</span>
+                  </div>
+                </div>
+
+                {/* Event Details Grid */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Users size={14} className="text-purple-500" />
+                    <span>{event.attendees || 0} guests</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Clock size={14} className="text-green-500" />
+                    <span>{(() => {
+                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                      const duration = apiEvent?.form_data?.duration || apiEvent?.duration;
+                      return duration ? duration.replace('-', ' ') : 'TBD';
+                    })()}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <span className="w-3 h-3 bg-purple-400 rounded-full"></span>
+                    <span>{(() => {
+                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                      const selectedServices = apiEvent?.selected_services;
+                      const vendorServices = apiEvent?.form_data?.selectedVendorServices;
+                      const serviceCount = selectedServices?.length || vendorServices?.length || 0;
+                      return `${serviceCount} vendors`;
+                    })()}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <span className={`w-3 h-3 rounded-full ${
+                      event.eventPriority === 'high' ? 'bg-red-400' :
+                      event.eventPriority === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                    }`}></span>
+                    <span className="capitalize">{event.eventPriority || 'medium'} priority</span>
+                  </div>
+                </div>
+
                 {/* Location and Date */}
                 <div className="space-y-2 text-sm text-gray-600">
                   {(event as any).venue && (
-                    <p className="flex items-center gap-1">
-                      <MapPin size={14} />
-                      {(event as any).venue}
+                    <p className="flex items-center gap-2">
+                      <MapPin size={14} className="text-blue-500" />
+                      <span>{(event as any).venue}</span>
                     </p>
                   )}
-                  <p className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    {event.dateTime ? formatDate(event.dateTime) : 'Date TBD'}
+                  <p className="flex items-center gap-2">
+                    <Calendar size={14} className="text-orange-500" />
+                    <span>{event.dateTime ? formatDate(event.dateTime) : 'Date TBD'}</span>
                   </p>
                 </div>
 
+                {/* Special Features */}
+                {(() => {
+                  const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                  const features = [];
+                  
+                  if (apiEvent?.form_data?.traditionStyle) features.push(apiEvent.form_data.traditionStyle);
+                  if (apiEvent?.form_data?.foodPreferences?.length) features.push(`${apiEvent.form_data.foodPreferences.length} food prefs`);
+                  if (apiEvent?.special_requirements && Object.keys(apiEvent.special_requirements).length > 0) {
+                    const reqCount = Object.values(apiEvent.special_requirements).filter(req => 
+                      typeof req === 'object' && req !== null && (req as any).selected
+                    ).length;
+                    if (reqCount > 0) features.push(`${reqCount} special reqs`);
+                  }
+                  
+                  return features.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {features.slice(0, 3).map((feature, idx) => (
+                        <span key={idx} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                          {feature}
+                        </span>
+                      ))}
+                      {features.length > 3 && (
+                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                          +{features.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Description */}
-                <p className="text-sm text-gray-600 line-clamp-2">
+                <p className="text-sm text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded">
                   {event.description || 'Professional event planning with expert coordination and seamless execution.'}
                 </p>
 
@@ -396,6 +497,17 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                   >
                     <Edit size={14} />
                     Edit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEventId(event.id);
+                      setShowDetailsModal(true);
+                    }}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <Eye size={14} />
+                    View
                   </button>
                   <button
                     onClick={(e) => {
