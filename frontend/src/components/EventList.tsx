@@ -194,65 +194,84 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              Back to Dashboard
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-sm text-gray-500">{filteredAndSortedEvents.length} events</div>
-            <div className="text-xs text-gray-400">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 relative overflow-hidden conference-form-page">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        {[...Array(8)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute bg-white/10 rounded-full animate-float"
+            style={{
+              width: `${20 + i * 10}px`,
+              height: `${20 + i * 10}px`,
+              left: `${10 + i * 12}%`,
+              top: `${15 + i * 10}%`,
+              animationDelay: `${i * 0.5}s`
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10 p-6 space-y-8">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-white/30 text-gray-700 hover:text-purple-600 hover:bg-white/90 transition-all duration-300 shadow-lg"
+              >
+                <ArrowLeft size={20} />
+                Back to Dashboard
+              </button>
+            )}
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              My Events
+            </h1>
+          </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/30 p-4 shadow-lg">
+            <div className="text-sm text-gray-600">{filteredAndSortedEvents.length} events</div>
+            <div className="text-xs text-gray-500">
               Total Budget: ₹{filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0).toLocaleString()}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-r from-purple-100 to-purple-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-purple-700">{filteredAndSortedEvents.length}</div>
-          <div className="text-sm text-purple-600">Total Events</div>
-        </div>
-        <div className="bg-gradient-to-r from-blue-100 to-blue-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-700">
-            {filteredAndSortedEvents.reduce((sum, event) => sum + (event.attendees || 0), 0).toLocaleString()}
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 text-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">{filteredAndSortedEvents.length}</div>
+            <div className="text-xs text-gray-600 font-medium">Total Events</div>
           </div>
-          <div className="text-sm text-blue-600">Total Guests</div>
-        </div>
-        <div className="bg-gradient-to-r from-green-100 to-green-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-700">
-            ₹{(filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0) / 100000).toFixed(1)}L
+          <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 text-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+              {filteredAndSortedEvents.reduce((sum, event) => sum + (event.attendees || 0), 0).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-600 font-medium">Total Guests</div>
           </div>
-          <div className="text-sm text-green-600">Total Budget</div>
-        </div>
-        <div className="bg-gradient-to-r from-orange-100 to-orange-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-orange-700">
-            {(() => {
-              const totalVendors = filteredAndSortedEvents.reduce((sum, event) => {
-                const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                const selectedServices = apiEvent?.selected_services;
-                const vendorServices = apiEvent?.form_data?.selectedVendorServices;
-                return sum + (selectedServices?.length || vendorServices?.length || 0);
-              }, 0);
-              return totalVendors;
-            })()}
+          <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 text-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">
+              ₹{(filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0) / 100000).toFixed(1)}L
+            </div>
+            <div className="text-xs text-gray-600 font-medium">Total Budget</div>
           </div>
-          <div className="text-sm text-orange-600">Total Vendors</div>
+          <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 text-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent">
+              {(() => {
+                const totalVendors = filteredAndSortedEvents.reduce((sum, event) => {
+                  const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                  const selectedServices = apiEvent?.selected_services;
+                  const vendorServices = apiEvent?.form_data?.selectedVendorServices;
+                  return sum + (selectedServices?.length || vendorServices?.length || 0);
+                }, 0);
+                return totalVendors;
+              })()}
+            </div>
+            <div className="text-xs text-gray-600 font-medium">Total Vendors</div>
+          </div>
         </div>
-      </div>
 
-      {/* Search and Filters */}
-      <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg border border-blue-300 p-4 space-y-4">
+        {/* Search and Filters */}
+        <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 space-y-3 shadow-lg">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -309,221 +328,180 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredAndSortedEvents.map((event, index) => {
-          const eventType = event.eventName.toLowerCase().includes('wedding') ? 'social' :
-                          event.eventName.toLowerCase().includes('conference') ? 'corporate' :
-                          event.eventName.toLowerCase().includes('festival') ? 'festival' :
-                          event.eventName.toLowerCase().includes('sports') ? 'sports' :
-                          event.eventName.toLowerCase().includes('cultural') ? 'cultural' :
-                          'corporate';
-          
-          return (
-            <div 
-              key={event.id}
-              className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-300 hover:border-purple-400 hover:shadow-xl transition-all duration-200 group interactive-card"
-            >
-              {/* Event Image Placeholder */}
-              <div className="h-40 bg-gradient-to-br from-purple-200 to-pink-300 relative overflow-hidden rounded-t-xl">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-4xl opacity-50">
-                    {eventType === 'social' ? '💍' : 
-                     eventType === 'corporate' ? '💼' :
-                     eventType === 'festival' ? '🎊' :
-                     eventType === 'sports' ? '⚽' :
-                     eventType === 'cultural' ? '🎭' : '📅'}
-                  </div>
-                </div>
-                
-                {/* Heart Icon */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(event.id);
-                  }}
-                  className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all"
-                >
-                  <Heart 
-                    size={16} 
-                    className={favorites.has(event.id) ? 'text-red-500 fill-current' : 'text-gray-400'}
-                  />
-                </button>
-
-                {/* Status Badge */}
-                <div className="absolute top-3 left-3">
-                  <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                    event.status === 'completed' 
-                      ? 'bg-emerald-100 text-emerald-800' 
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {event.status === 'completed' ? 'Completed' : 'Draft'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Card Content */}
-              <div className="p-4 space-y-3">
-                {/* Event Name and Price */}
-                <div className="space-y-1">
-                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
-                    {event.eventName}
-                  </h3>
-                  <div className="flex items-center justify-between">
-                    <p className="text-2xl font-bold text-purple-600">
-                      ₹{event.budget?.toLocaleString() || '0'}
-                    </p>
-                    {(() => {
-                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                      const eventType = apiEvent?.form_data?.event_type || 'general';
-                      const subType = apiEvent?.form_data?.sub_type || 'event';
-                      return (
-                        <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
-                          {subType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Client Information */}
-                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Client:</span>
-                    <span className="text-sm text-gray-900 font-medium">{event.clientName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Contact:</span>
-                    <span className="text-sm text-gray-600">{event.clientPhone}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Email:</span>
-                    <span className="text-sm text-gray-600 truncate max-w-32">{event.clientEmail}</span>
-                  </div>
-                </div>
-
-                {/* Event Details Grid */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Users size={14} className="text-purple-500" />
-                    <span>{event.attendees || 0} guests</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Clock size={14} className="text-green-500" />
-                    <span>{(() => {
-                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                      const duration = apiEvent?.form_data?.duration || apiEvent?.duration;
-                      return duration ? duration.replace('-', ' ') : 'TBD';
-                    })()}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <span className="w-3 h-3 bg-purple-400 rounded-full"></span>
-                    <span>{(() => {
-                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                      const selectedServices = apiEvent?.selected_services;
-                      const vendorServices = apiEvent?.form_data?.selectedVendorServices;
-                      const serviceCount = selectedServices?.length || vendorServices?.length || 0;
-                      return `${serviceCount} vendors`;
-                    })()}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <span className={`w-3 h-3 rounded-full ${
-                      event.eventPriority === 'high' ? 'bg-red-400' :
-                      event.eventPriority === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
-                    }`}></span>
-                    <span className="capitalize">{event.eventPriority || 'medium'} priority</span>
-                  </div>
-                </div>
-
-                {/* Location and Date */}
-                <div className="space-y-2 text-sm text-gray-600">
-                  {(event as any).venue && (
-                    <p className="flex items-center gap-2">
-                      <MapPin size={14} className="text-blue-500" />
-                      <span>{(event as any).venue}</span>
-                    </p>
-                  )}
-                  <p className="flex items-center gap-2">
-                    <Calendar size={14} className="text-orange-500" />
-                    <span>{event.dateTime ? formatDate(event.dateTime) : 'Date TBD'}</span>
-                  </p>
-                </div>
-
-                {/* Special Features */}
-                {(() => {
-                  const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                  const features = [];
-                  
-                  if (apiEvent?.form_data?.traditionStyle) features.push(apiEvent.form_data.traditionStyle);
-                  if (apiEvent?.form_data?.foodPreferences?.length) features.push(`${apiEvent.form_data.foodPreferences.length} food prefs`);
-                  if (apiEvent?.special_requirements && Object.keys(apiEvent.special_requirements).length > 0) {
-                    const reqCount = Object.values(apiEvent.special_requirements).filter(req => 
-                      typeof req === 'object' && req !== null && (req as any).selected
-                    ).length;
-                    if (reqCount > 0) features.push(`${reqCount} special reqs`);
-                  }
-                  
-                  return features.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {features.slice(0, 3).map((feature, idx) => (
-                        <span key={idx} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                          {feature}
-                        </span>
-                      ))}
-                      {features.length > 3 && (
-                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                          +{features.length - 3} more
-                        </span>
-                      )}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+          {filteredAndSortedEvents.map((event, index) => {
+            const eventType = event.eventName.toLowerCase().includes('wedding') ? 'social' :
+                            event.eventName.toLowerCase().includes('conference') ? 'corporate' :
+                            event.eventName.toLowerCase().includes('festival') ? 'festival' :
+                            event.eventName.toLowerCase().includes('sports') ? 'sports' :
+                            event.eventName.toLowerCase().includes('cultural') ? 'cultural' :
+                            'corporate';
+            
+            // Skin color combinations
+            const skinColors = [
+              'from-amber-100 via-orange-50 to-yellow-50',
+              'from-rose-100 via-pink-50 to-orange-50', 
+              'from-orange-100 via-amber-50 to-yellow-50',
+              'from-yellow-100 via-orange-50 to-amber-50',
+              'from-pink-100 via-rose-50 to-orange-50',
+              'from-amber-50 via-yellow-50 to-orange-50'
+            ];
+            const skinColor = skinColors[index % skinColors.length];
+            
+            return (
+              <div 
+                key={event.id}
+                className={`bg-gradient-to-br ${skinColor} backdrop-blur-sm rounded-xl border border-amber-200/40 hover:border-orange-300/60 shadow-sm hover:shadow-md transition-all duration-300 group transform hover:scale-105 relative overflow-hidden`}
+              >
+                {/* Event Image Placeholder */}
+                <div className="h-16 bg-gradient-to-br from-amber-200 via-orange-200 to-yellow-200 relative overflow-hidden rounded-t-xl">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-lg opacity-60">
+                      {eventType === 'social' ? '💍' : 
+                       eventType === 'corporate' ? '💼' :
+                       eventType === 'festival' ? '🎊' :
+                       eventType === 'sports' ? '⚽' :
+                       eventType === 'cultural' ? '🎭' : '📅'}
                     </div>
-                  );
-                })()}
+                  </div>
+                  
+                  {/* Heart Icon */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(event.id);
+                    }}
+                    className="absolute top-1 right-1 w-5 h-5 bg-white/90 rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-all"
+                  >
+                    <Heart 
+                      size={10} 
+                      className={favorites.has(event.id) ? 'text-red-500 fill-current' : 'text-gray-400'}
+                    />
+                  </button>
 
-                {/* Description */}
-                <p className="text-sm text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded">
-                  {event.description || 'Professional event planning with expert coordination and seamless execution.'}
-                </p>
+                  {/* Status Badge */}
+                  <div className="absolute top-1 left-1">
+                    <span className={`px-1 py-0.5 text-xs rounded-full font-medium ${
+                      event.status === 'completed' 
+                        ? 'bg-emerald-100/90 text-emerald-700' 
+                        : 'bg-amber-100/90 text-amber-700'
+                    }`}>
+                      {event.status === 'completed' ? '✓' : '•'}
+                    </span>
+                  </div>
+                </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                      const eventType = apiEvent?.form_data?.event_type || 'corporate';
-                      const subType = apiEvent?.form_data?.sub_type || 'conference';
-                      onEditEvent(event.id, eventType, subType);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                  >
-                    <Edit size={14} />
-                    Edit
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedEventId(event.id);
-                      setShowDetailsModal(true);
-                    }}
-                    className="flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <Eye size={14} />
-                    View
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(event.id, (event as any).isApiEvent);
-                    }}
-                    className="flex items-center justify-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                {/* Card Content */}
+                <div className="p-2 space-y-1.5">
+                  {/* Event Name and Price */}
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-bold text-gray-800 group-hover:text-orange-700 transition-colors line-clamp-1">
+                      {event.eventName}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-orange-600">
+                        ₹{(event.budget || 0) > 100000 ? `${((event.budget || 0) / 100000).toFixed(1)}L` : (event.budget || 0).toLocaleString()}
+                      </p>
+                      {(() => {
+                        const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                        const subType = apiEvent?.form_data?.sub_type || 'event';
+                        return (
+                          <span className="px-1 py-0.5 text-xs bg-orange-100/80 text-orange-700 rounded-md font-medium">
+                            {subType.split('-')[0].charAt(0).toUpperCase() + subType.split('-')[0].slice(1)}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Client Information */}
+                  <div className="bg-white/60 rounded-md p-1.5 space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-600">Client:</span>
+                      <span className="text-xs text-gray-800 font-medium truncate max-w-12">{event.clientName}</span>
+                    </div>
+                  </div>
+
+                  {/* Event Details Grid */}
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Users size={8} className="text-orange-500" />
+                      <span>{event.attendees || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <span className="w-1 h-1 bg-orange-400 rounded-full"></span>
+                      <span>{(() => {
+                        const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                        const selectedServices = apiEvent?.selected_services;
+                        const vendorServices = apiEvent?.form_data?.selectedVendorServices;
+                        const serviceCount = selectedServices?.length || vendorServices?.length || 0;
+                        return serviceCount;
+                      })()}</span>
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div className="text-xs text-gray-600">
+                    <p className="flex items-center gap-1">
+                      <Calendar size={8} className="text-amber-500" />
+                      <span className="truncate">{event.dateTime ? new Date(event.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}</span>
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-1 pt-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
+                        const eventType = apiEvent?.form_data?.event_type || 'corporate';
+                        const subType = apiEvent?.form_data?.sub_type || 'conference';
+                        onEditEvent(event.id, eventType, subType);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-amber-400 text-white rounded-md hover:from-orange-500 hover:to-amber-500 transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <Edit size={8} />
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEventId(event.id);
+                        setShowDetailsModal(true);
+                      }}
+                      className="flex items-center justify-center px-1.5 py-1 text-xs font-semibold bg-white/80 text-gray-700 rounded-md border border-amber-200 hover:bg-white/90 transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <Eye size={8} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(event.id, (event as any).isApiEvent);
+                      }}
+                      className="flex items-center justify-center px-1.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50/80 rounded-md border border-red-200/60 hover:border-red-300 transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <Trash2 size={8} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+      
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
+          25% { transform: translateY(-20px) rotate(90deg); opacity: 1; }
+          50% { transform: translateY(-10px) rotate(180deg); opacity: 0.8; }
+          75% { transform: translateY(-15px) rotate(270deg); opacity: 0.9; }
+        }
+        
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+      `}</style>
       
       <EventDetailsModal
         isOpen={showDetailsModal}

@@ -129,13 +129,19 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='requirements')
     def get_event_requirements(self, request):
-        """Get event requirements by event_id"""
+        """Get event requirements by event_id, with fallback to all requirements"""
         event_id = request.query_params.get('event_id')
         if not event_id:
             return Response([])
         
         try:
+            # First try to get event-specific requirements
             requirements = EventRequirement.objects.filter(event_id=event_id)
+            
+            # If no event-specific requirements found, return all requirements
+            if not requirements.exists():
+                requirements = EventRequirement.objects.all()
+            
             serializer = EventRequirementSerializer(requirements, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -210,13 +216,24 @@ class EventViewSet(viewsets.ModelViewSet):
                 if event_type in event_mappings:
                     search_ids.append(event_mappings[event_type])
             
-            search_ids.append('default')
+            # Always include 'default' first to get our new subsections
+            if 'default' not in search_ids:
+                search_ids.insert(0, 'default')
             
             # Find first matching requirements
+            requirements = None
             for search_id in search_ids:
-                requirements = EventRequirement.objects.filter(event_id=search_id)
-                if requirements.exists():
-                    break
+                temp_requirements = EventRequirement.objects.filter(event_id=search_id)
+                if temp_requirements.exists():
+                    if requirements is None:
+                        requirements = temp_requirements
+                    else:
+                        # Combine requirements from multiple sources
+                        requirements = requirements.union(temp_requirements)
+            
+            # If no event-specific requirements found, get all requirements
+            if requirements is None or not requirements.exists():
+                requirements = EventRequirement.objects.all()
             
             # Group requirements by category
             grouped_requirements = {}
@@ -283,37 +300,31 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_requirement_questions(self, request):
         """Get dynamic questions for a specific requirement"""
         requirement_id = request.query_params.get('requirement_id')
-        event_id = request.query_params.get('event_id')
-        
-        if not requirement_id:
-            return Response({'error': 'requirement_id is required'}, status=400)
         
         try:
-            # Find the requirement
-            requirement_filter = {'requirement_id': requirement_id}
-            if event_id:
-                requirement_filter['event_id'] = event_id
+            # Find requirement by requirement_id
+            requirement = EventRequirement.objects.filter(
+                requirement_id=requirement_id
+            ).first()
             
-            requirement = EventRequirement.objects.filter(**requirement_filter).first()
+            if requirement:
+                # Use the requirement object (foreign key) to find questions
+                questions = RequirementQuestion.objects.filter(requirement=requirement)
+                serializer = RequirementQuestionSerializer(questions, many=True)
+                
+                return Response({
+                    'requirement': {
+                        'id': requirement.requirement_id,
+                        'label': requirement.label,
+                        'category': requirement.category
+                    },
+                    'questions': serializer.data
+                })
             
-            if not requirement:
-                return Response({'questions': []})
-            
-            # Get questions for this requirement
-            questions = RequirementQuestion.objects.filter(requirement=requirement)
-            serializer = RequirementQuestionSerializer(questions, many=True)
-            
-            return Response({
-                'requirement': {
-                    'id': requirement.requirement_id,
-                    'label': requirement.label,
-                    'category': requirement.category
-                },
-                'questions': serializer.data
-            })
+            return Response({'questions': []})
             
         except Exception as e:
-            return Response({'error': str(e)}, status=500)
+            return Response({'questions': []}, status=200)
     
     @action(detail=False, methods=['get'], url_path='requirement-images')
     def get_requirement_images(self, request):
@@ -325,14 +336,16 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': 'requirement_name is required'}, status=400)
         
         try:
-            # Filter by requirement_name and optionally by event_name
-            filter_params = {'requirement_name': requirement_name}
+            # Match both event_name and requirement_name
             if event_name:
-                filter_params['event_name'] = event_name
-            
-            images = EventRequirementImages.objects.filter(
-                **filter_params
-            ).order_by('event_name', 'image_number')
+                images = EventRequirementImages.objects.filter(
+                    event_name=event_name,
+                    requirement_name=requirement_name
+                ).order_by('image_number')
+            else:
+                images = EventRequirementImages.objects.filter(
+                    requirement_name=requirement_name
+                ).order_by('image_number')
             
             image_urls = [img.image_url for img in images]
             
@@ -343,4 +356,4 @@ class EventViewSet(viewsets.ModelViewSet):
             })
             
         except Exception as e:
-            return Response({'error': str(e)}, status=500)
+            return Response({'images': []}, status=200)

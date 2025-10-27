@@ -85,9 +85,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [apiSections, setApiSections] = useState<any[]>([]);
   const [apiImages, setApiImages] = useState<Record<string, string>>({});
-  const [requirementQuestions, setRequirementQuestions] = useState<Record<string, any[]>>({});
-  const [loadingQuestions, setLoadingQuestions] = useState<Record<string, boolean>>({});
-  const [requirementAnswers, setRequirementAnswers] = useState<Record<string, Record<string, any>>>({});
+
   const [showRequirementModal, setShowRequirementModal] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<{id: string; label: string} | null>(null);
 
@@ -115,7 +113,6 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       const baseSteps = ['basic', 'location', 'duration', 'budget'];
       const conditionalSteps = [];
       
-      // Show tradition for social, cultural, religious, festival events
       if (['social', 'cultural', 'religious', 'festival'].includes(sectionId) || 
           subsection?.name.toLowerCase().includes('wedding') ||
           subsection?.name.toLowerCase().includes('birthday') ||
@@ -124,70 +121,60 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         conditionalSteps.push('tradition');
       }
       
-      // Show food for events that typically involve catering
       if (['social', 'cultural', 'religious', 'festival', 'corporate'].includes(sectionId) &&
           !['webinar', 'online-webinar', 'virtual-conference', 'tree-planting-drive', 'clean-up-drive'].includes(subsectionId)) {
         conditionalSteps.push('food');
       }
       
-      // Show requirements for ALL events - every event should have special requirements
-      conditionalSteps.push('requirements');
-      
-      // Show timeline for all events
-      conditionalSteps.push('timeline');
-      
-
-      
+      conditionalSteps.push('requirements', 'timeline');
       const finalSteps = [...baseSteps, ...conditionalSteps, 'review'];
       return steps.filter(step => finalSteps.includes(step.id));
     }
     
+    // Quick planning flow - only after user chooses quick
     if (wantsDetailedPlanning === false) {
-      // For quick planning, show venues/vendors instead of planning choice
-      const quickSteps = ['basic', 'location', 'duration', 'budget', 'venues', 'vendors'];
+      const quickSteps = ['basic', 'location', 'duration', 'budget', 'thankyou', 'venues', 'vendors', 'review'];
       return steps.filter(step => quickSteps.includes(step.id));
     }
     
-    // Dynamic step visibility based on event type for detailed planning
-    const baseSteps = ['basic', 'location', 'duration', 'budget', 'thankyou'];
-    const conditionalSteps = [];
+    // Detailed planning flow (default and when user chooses detailed)
+    const detailedSteps = ['basic', 'location', 'duration', 'budget', 'thankyou'];
     
-    // Show tradition for social, cultural, religious, festival events
     if (['social', 'cultural', 'religious', 'festival'].includes(sectionId) || 
         subsection?.name.toLowerCase().includes('wedding') ||
         subsection?.name.toLowerCase().includes('birthday') ||
         subsection?.name.toLowerCase().includes('party') ||
         subsection?.name.toLowerCase().includes('celebration')) {
-      conditionalSteps.push('tradition');
+      detailedSteps.push('tradition');
     }
     
-    // Show food for events that typically involve catering
     if (['social', 'cultural', 'religious', 'festival', 'corporate'].includes(sectionId) &&
         !['webinar', 'online-webinar', 'virtual-conference', 'tree-planting-drive', 'clean-up-drive'].includes(subsectionId)) {
-      conditionalSteps.push('food');
+      detailedSteps.push('food');
     }
     
-    // Show requirements for ALL events - every event should have special requirements
-    conditionalSteps.push('requirements');
-    
-    // Show timeline for all events
-    conditionalSteps.push('timeline');
-    
-    const finalSteps = [...baseSteps, ...conditionalSteps, 'review'];
-    return steps.filter(step => finalSteps.includes(step.id));
+    detailedSteps.push('requirements', 'timeline', 'review');
+    return steps.filter(step => detailedSteps.includes(step.id));
   };
 
   const getCurrentStepIndex = () => {
     const visibleSteps = getVisibleSteps();
     const index = visibleSteps.findIndex(step => step.id === currentStep);
-    return index === -1 ? 0 : index;
+    return index >= 0 ? index : 0;
   };
 
   const getProgressPercentage = () => {
     const visibleSteps = getVisibleSteps();
     const currentIndex = getCurrentStepIndex();
-    if (currentIndex === -1) return 0;
     return ((currentIndex + 1) / visibleSteps.length) * 100;
+  };
+
+  const getStepProgress = () => {
+    const visibleSteps = getVisibleSteps();
+    const currentIndex = getCurrentStepIndex();
+    const totalSteps = visibleSteps.length;
+    const currentStepNumber = Math.max(1, currentIndex + 1);
+    return `${currentStepNumber}/${totalSteps}`;
   };
 
   useEffect(() => {
@@ -387,81 +374,74 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     
     setCompletedSteps(prev => new Set([...prev, currentStep]));
     
-    const visibleSteps = getVisibleSteps();
-    const currentIndex = getCurrentStepIndex();
-    
-    if (currentStep === 'thankyou') {
-      if (wantsDetailedPlanning === true) {
-        // Find the next step after thankyou in the visible steps
-        const visibleSteps = getVisibleSteps();
-        const thankyouIndex = visibleSteps.findIndex(step => step.id === 'thankyou');
-        if (thankyouIndex < visibleSteps.length - 1) {
-          setCurrentStep(visibleSteps[thankyouIndex + 1].id);
-        }
-      } else {
-        setCurrentStep('venues');
+    if (currentStep === 'budget' && !editEventId) {
+      setCurrentStep('thankyou');
+    } else {
+      const visibleSteps = getVisibleSteps();
+      const currentIndex = getCurrentStepIndex();
+      
+      if (currentIndex >= 0 && currentIndex < visibleSteps.length - 1) {
+        setCurrentStep(visibleSteps[currentIndex + 1].id);
       }
-    } else if (currentIndex < visibleSteps.length - 1) {
-      const nextStep = visibleSteps[currentIndex + 1];
-      setCurrentStep(nextStep.id);
     }
     
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePrevStep = () => {
-    const visibleSteps = getVisibleSteps();
-    const currentIndex = getCurrentStepIndex();
-    
+    // Special handling for thankyou step
     if (currentStep === 'thankyou') {
-      // Remove thankyou from completed steps when going back
       setCompletedSteps(prev => {
         const newCompleted = new Set(prev);
         newCompleted.delete('thankyou');
         return newCompleted;
       });
+      setWantsDetailedPlanning(null);
       setCurrentStep('budget');
-    } else if (currentStep === 'tradition' && wantsDetailedPlanning === true) {
-      setCurrentStep('thankyou');
-    } else if (currentStep === 'venues' && wantsDetailedPlanning === false) {
-      setCurrentStep('budget');
-    } else if (currentStep === 'budget' && wantsDetailedPlanning === false) {
-      setCurrentStep('thankyou');
-    } else if (currentIndex > 0) {
-      setCurrentStep(visibleSteps[currentIndex - 1].id);
+    } else {
+      const visibleSteps = getVisibleSteps();
+      const currentIndex = getCurrentStepIndex();
+      
+      if (currentIndex > 0) {
+        const prevStep = visibleSteps[currentIndex - 1];
+        setCurrentStep(prevStep.id);
+        
+        // Remove current step from completed steps when going back
+        setCompletedSteps(prev => {
+          const newCompleted = new Set(prev);
+          newCompleted.delete(currentStep);
+          return newCompleted;
+        });
+      }
     }
     
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDetailedPlanningChoice = (choice: boolean) => {
     setWantsDetailedPlanning(choice);
     setCompletedSteps(prev => new Set([...prev, 'thankyou']));
-    
-    // Set planning type in form data
     handleInputChange('planningType', choice ? 'detailed' : 'skip');
     
-    // Immediately navigate to next step
-    if (choice === true) {
-      // Get the visible steps for detailed planning
-      const visibleSteps = getVisibleSteps();
-      const thankyouIndex = visibleSteps.findIndex(step => step.id === 'thankyou');
-      
-      // Navigate to the next step after thankyou in the visible steps
-      if (thankyouIndex < visibleSteps.length - 1) {
-        const nextStep = visibleSteps[thankyouIndex + 1];
-        setCurrentStep(nextStep.id);
+    if (choice === false) {
+      // Quick planning - go directly to venues
+      setCurrentStep('venues');
+    } else {
+      // Detailed planning - go to next step in sequence
+      if (['social', 'cultural', 'religious', 'festival'].includes(sectionId) || 
+          subsection?.name.toLowerCase().includes('wedding') ||
+          subsection?.name.toLowerCase().includes('birthday') ||
+          subsection?.name.toLowerCase().includes('party') ||
+          subsection?.name.toLowerCase().includes('celebration')) {
+        setCurrentStep('tradition');
+      } else if (['social', 'cultural', 'religious', 'festival', 'corporate'].includes(sectionId) &&
+          !['webinar', 'online-webinar', 'virtual-conference', 'tree-planting-drive', 'clean-up-drive'].includes(subsectionId)) {
+        setCurrentStep('food');
       } else {
-        // Fallback to requirements if no next step found
         setCurrentStep('requirements');
       }
-    } else {
-      setCurrentStep('venues');
     }
     
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -760,7 +740,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           Previous
         </button>
         
-        {currentStep !== 'thankyou' && (
+        {currentStep !== 'thankyou' && currentStep !== 'vendors' && (
           <button
             onClick={currentStep === 'review' ? handleSubmit : handleNextStep}
             disabled={isSubmitting}
@@ -885,11 +865,10 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                   return;
                 }
                 
-                // Don't auto-set dateTime, wait for date selection or keep it empty
-                if (selectedDate) {
-                  const time = formData.dateTime ? formData.dateTime.split('T')[1] || '12:00' : '12:00';
-                  handleInputChange('dateTime', `${selectedDate}T${time}`);
-                }
+                // Clear selected date when month changes
+                setSelectedDate('');
+                // Clear dateTime when month changes
+                handleInputChange('dateTime', '');
               }
             }}
             disabled={!selectedYear}
@@ -927,7 +906,17 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             }}
             disabled={!selectedYear || selectedMonth === null}
             min={new Date().toISOString().split('T')[0]}
+            max={selectedYear && selectedMonth !== null ? `${selectedYear}-12-31` : undefined}
             className="w-full py-3 px-4 rounded-xl border-2 border-gray-300 focus:border-[#C4A661] focus:ring-2 focus:ring-[#C4A661] focus:ring-opacity-20 transition-all disabled:opacity-50"
+            onFocus={(e) => {
+              if (selectedYear && selectedMonth !== null) {
+                const monthStr = (selectedMonth + 1).toString().padStart(2, '0');
+                const defaultDate = `${selectedYear}-${monthStr}-01`;
+                if (!selectedDate) {
+                  e.target.value = defaultDate;
+                }
+              }
+            }}
           />
           <p className="text-xs text-gray-500 mt-2">*We will consider 2 days if a date isn't selected</p>
         </div>
@@ -1074,6 +1063,8 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [apiVendorServices, setApiVendorServices] = useState<any[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
   
   // Debug traditions state
   useEffect(() => {
@@ -1669,169 +1660,32 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     setExpandedCategories(newExpanded);
   };
 
-  const loadQuestionsForRequirement = async (requirementId: string, label: string) => {
-    if (requirementQuestions[requirementId]) {
-      return; // Questions already loaded
-    }
-    
-    setLoadingQuestions(prev => ({ ...prev, [requirementId]: true }));
-    
-    try {
-      const response = await fetch(`http://localhost:8000/api/events/requirement-questions/?requirement_id=${requirementId}&event_id=${subsectionId}`);
-      const data = await response.json();
-      
-      if (data.questions && data.questions.length > 0) {
-        setRequirementQuestions(prev => ({
-          ...prev,
-          [requirementId]: data.questions
-        }));
-        
-        // Initialize answers for the questions
-        const initialAnswers: Record<string, any> = {};
-        data.questions.forEach((q: any) => {
-          if (q.question_type === 'checkbox') {
-            initialAnswers[q.id] = [];
-          } else {
-            initialAnswers[q.id] = '';
-          }
-        });
-        setRequirementAnswers(prev => ({
-          ...prev,
-          [requirementId]: initialAnswers
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading questions:', error);
-    } finally {
-      setLoadingQuestions(prev => ({ ...prev, [requirementId]: false }));
-    }
-  };
-
-  const updateRequirementAnswer = (requirementId: string, questionId: string, value: any) => {
-    setRequirementAnswers(prev => ({
-      ...prev,
-      [requirementId]: {
-        ...prev[requirementId],
-        [questionId]: value
-      }
-    }));
-  };
-
-  const handleCheckboxAnswer = (requirementId: string, questionId: string, option: string, checked: boolean) => {
-    const currentAnswers = requirementAnswers[requirementId] || {};
-    const currentValues = currentAnswers[questionId] || [];
-    
-    const newValues = checked
-      ? [...currentValues, option]
-      : currentValues.filter((v: string) => v !== option);
-    
-    updateRequirementAnswer(requirementId, questionId, newValues);
-  };
-
-  const renderQuestion = (requirementId: string, question: any) => {
-    const answers = requirementAnswers[requirementId] || {};
-    const currentValue = answers[question.id] || '';
-    
-    switch (question.question_type) {
-      case 'text':
-        return (
-          <input
-            type="text"
-            value={currentValue}
-            onChange={(e) => updateRequirementAnswer(requirementId, question.id, e.target.value)}
-            placeholder={question.placeholder}
-            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A661] focus:border-transparent text-sm"
-          />
-        );
-
-      case 'number':
-        return (
-          <input
-            type="number"
-            value={currentValue}
-            onChange={(e) => updateRequirementAnswer(requirementId, question.id, parseInt(e.target.value) || '')}
-            min={question.min_value}
-            max={question.max_value}
-            placeholder={question.placeholder}
-            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A661] focus:border-transparent text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        );
-
-      case 'dropdown':
-        return (
-          <select
-            value={currentValue}
-            onChange={(e) => updateRequirementAnswer(requirementId, question.id, e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A661] focus:border-transparent text-sm"
-          >
-            <option value="">Select an option</option>
-            {question.options?.map((option: string, index: number) => (
-              <option key={index} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        );
-
-      case 'radio':
-        return (
-          <div className="space-y-2">
-            {question.options?.map((option: string, index: number) => (
-              <label key={index} className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name={`${requirementId}_${question.id}`}
-                  value={option}
-                  checked={currentValue === option}
-                  onChange={(e) => updateRequirementAnswer(requirementId, question.id, e.target.value)}
-                  className="text-[#C4A661] focus:ring-[#C4A661]"
-                />
-                <span className="text-sm">{option}</span>
-              </label>
-            ))}
-          </div>
-        );
-
-      case 'checkbox':
-        return (
-          <div className="space-y-2">
-            {question.options?.map((option: string, index: number) => (
-              <label key={index} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={(currentValue || []).includes(option)}
-                  onChange={(e) => handleCheckboxAnswer(requirementId, question.id, option, e.target.checked)}
-                  className="text-[#C4A661] focus:ring-[#C4A661]"
-                />
-                <span className="text-sm">{option}</span>
-              </label>
-            ))}
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   useEffect(() => {
     if (currentStep === 'requirements') {
       const loadRequirements = async () => {
         setRequirementsLoaded(false);
         try {
-          // Try API first
-          const reqs = await getDynamicRequirementsFromApi(sectionId, subsectionId);
-          if (reqs && Object.keys(reqs).length > 0) {
-            setApiRequirements(reqs);
-          } else {
-            // Use local fallback
-            const localReqs = getRequirementsForEvent(sectionId, subsectionId);
-            setApiRequirements(localReqs);
-          }
+          // Fetch requirements directly from database
+          const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`);
+          const dbRequirements = await response.json();
+          
+          // Group by category_name
+          const grouped = dbRequirements.reduce((acc: Record<string, any[]>, req: any) => {
+            if (!acc[req.category_name]) acc[req.category_name] = [];
+            acc[req.category_name].push({
+              id: req.requirement_id,
+              label: req.label,
+              category: req.category,
+              unit: req.unit,
+              placeholder: req.placeholder
+            });
+            return acc;
+          }, {});
+          
+          setApiRequirements(grouped);
         } catch (error) {
-          // Use local fallback on error
-          const localReqs = getRequirementsForEvent(sectionId, subsectionId);
-          setApiRequirements(localReqs);
+          console.error('Error loading requirements:', error);
+          setApiRequirements(getRequirementsForEvent(sectionId, subsectionId));
         } finally {
           setRequirementsLoaded(true);
         }
@@ -1840,8 +1694,11 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     }
     
     if (currentStep === 'tradition') {
-      console.log('Loading traditions for section:', sectionId, 'subsection:', subsectionId);
       loadTraditions();
+    }
+    
+    if (currentStep === 'vendors') {
+      loadVendorServices();
     }
   }, [currentStep, subsectionId, sectionId]);
 
@@ -1855,17 +1712,12 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
 
   const getDefaultRequirements = () => ({
     'Essential Services': [
-      { id: 'event-photography', label: 'Event Photography', category: 'photography' },
-      { id: 'event-coordination', label: 'Event Coordination', category: 'coordination' },
-      { id: 'event-decoration', label: 'Event Decoration', category: 'decoration' }
+      { id: 'basic-decoration', label: 'Basic Decoration', category: 'decoration', unit: 'setups', placeholder: 'How many decoration setups?' },
+      { id: 'sound-system', label: 'Sound System', category: 'music_dj' }
     ],
     'Catering Services': [
       { id: 'event-catering', label: 'Event Catering', category: 'catering', unit: 'meals', placeholder: 'How many meals?' },
       { id: 'refreshments', label: 'Refreshments', category: 'catering', unit: 'servings', placeholder: 'How many servings?' }
-    ],
-    'Technical Support': [
-      { id: 'av-equipment', label: 'AV Equipment', category: 'other', unit: 'sets', placeholder: 'How many AV sets?' },
-      { id: 'sound-system', label: 'Sound System', category: 'music_dj' }
     ]
   });
 
@@ -1879,17 +1731,26 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       );
     }
 
-    // Get requirements with proper fallback
-    let requirements = {};
+    // Get requirements directly from database via API
+    let requirements: Record<string, any[]> = {};
     try {
-      requirements = Object.keys(apiRequirements).length > 0 ? apiRequirements : getRequirementsForEvent(sectionId, subsectionId);
+      const allRequirements = Object.keys(apiRequirements).length > 0 ? apiRequirements : getRequirementsForEvent(sectionId, subsectionId);
+      console.log('Database requirements loaded:', allRequirements);
       
-      // Ensure requirements is an object with at least some data
-      if (!requirements || typeof requirements !== 'object' || Object.keys(requirements).length === 0) {
+      // Filter out Vendor Services and structure the data
+      requirements = {};
+      Object.entries(allRequirements).forEach(([categoryName, services]) => {
+        if (categoryName !== 'Vendor Services') {
+          if (Array.isArray(services)) {
+            (requirements as Record<string, any[]>)[categoryName] = services;
+          }
+        }
+      });
+      
+      if (Object.keys(requirements).length === 0) {
         requirements = getDefaultRequirements();
       }
     } catch (error) {
-      console.warn('Error processing requirements:', error);
       requirements = getDefaultRequirements();
     }
     
@@ -1897,7 +1758,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       <div className="space-y-6">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Special Requirements</h2>
-          <p className="text-gray-600">Select services you need for your {subsection?.name.toLowerCase()}</p>
+          <p className="text-gray-600">Select requirements and vendor services for your {subsection?.name.toLowerCase()}</p>
         </div>
         
         {Object.keys(requirements).length === 0 ? (
@@ -1910,6 +1771,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             {Object.entries(requirements).map(([categoryName, services]) => {
               // Ensure services is an array
               const serviceArray = Array.isArray(services) ? services : [];
+
               if (serviceArray.length === 0) return null;
               
               const isExpanded = expandedCategories.has(categoryName);
@@ -1950,15 +1812,12 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                     </div>
                   </div>
                   
-                  {isExpanded && (
+                  {isExpanded && serviceArray.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-[#E5D5A3]">
                       {serviceArray.map((service: any) => {
                         if (!service || !service.id || !service.label) return null;
                         
                         const isSubSelected = (formData.specialRequirements || {})[service.id]?.selected || (formData.selectedServices || []).includes(service.label);
-                        const hasQuantity = service.unit && service.placeholder;
-                        const currentRequirements = formData.specialRequirements || {};
-                        const serviceQuantity = typeof currentRequirements[service.id] === 'string' ? currentRequirements[service.id] as string : '';
                         
                         return (
                           <div key={service.id} className="bg-white rounded-lg p-4 border border-[#E5D5A3]">
@@ -1977,7 +1836,6 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                                 type="button"
                                 onClick={() => {
                                   if (isSubSelected) {
-                                    // Deselect
                                     const updatedRequirements = { ...formData.specialRequirements };
                                     delete updatedRequirements[service.id];
                                     const updatedServices = (formData.selectedServices || []).filter(s => s !== service.label);
@@ -2000,6 +1858,12 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                  
+                  {isExpanded && serviceArray.length === 0 && (
+                    <div className="mt-4 pt-4 border-t border-[#E5D5A3] text-center text-gray-500">
+                      No individual services available for this category.
                     </div>
                   )}
                 </div>
@@ -2505,8 +2369,58 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     return filteredServices;
   };
 
+  const loadVendorServices = async () => {
+    setLoadingVendors(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`);
+      const data = await response.json();
+      
+      // Filter for Vendor Services category
+      const vendorServices = data.filter((req: any) => req.category_name === 'Vendor Services');
+      setApiVendorServices(vendorServices);
+    } catch (error) {
+      console.warn('Failed to load vendor services from API, using fallback:', error);
+      setApiVendorServices([]);
+    } finally {
+      setLoadingVendors(false);
+    }
+  };
+
+  const getVendorIcon = (category: string) => {
+    const icons: Record<string, string> = {
+      'catering': '🍽️',
+      'photography': '📸',
+      'videography': '🎥',
+      'decoration': '🎨',
+      'flowers': '💐',
+      'entertainment': '🎭',
+      'beauty': '💄',
+      'coordination': '📋',
+      'transportation': '🚗',
+      'security': '🛡️',
+      'av_technical': '🎤',
+      'medical': '🏥',
+      'religious': '🕉️',
+      'speaking': '🎓',
+      'marketing': '📢',
+      'virtual_platform': '💻',
+      'equipment': '🛠️',
+      'other': '🔧'
+    };
+    return icons[category] || '👥';
+  };
+
   const renderVendorsStep = () => {
-    const vendorServices = getVendorServicesForEvent();
+    if (loadingVendors) {
+      return (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C4A661] mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading vendor services...</p>
+        </div>
+      );
+    }
+
+    const vendorServices = apiVendorServices.length > 0 ? apiVendorServices : getVendorServicesForEvent();
     
     const toggleVendorService = (serviceId: string) => {
       setSelectedVendorServices(prev => 
@@ -2528,22 +2442,29 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         <div className="space-y-8">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">👥 Vendor Services</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {vendorServices.map(service => (
-                <button
-                  key={service.id}
-                  onClick={() => toggleVendorService(service.id)}
-                  className={`p-4 rounded-xl text-center transition-all border-2 ${
-                    selectedVendorServices.includes(service.id)
-                      ? 'border-[#C4A661] bg-[#C4A661] text-white'
-                      : 'border-gray-300 bg-white text-gray-700 hover:border-[#C4A661]'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">{service.icon}</div>
-                  <div className="text-sm font-medium">{service.name}</div>
-                  <div className="text-xs mt-1 opacity-75">{service.description}</div>
-                </button>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vendorServices.map((service: any) => {
+                const serviceId = service.requirement_id || service.id;
+                const serviceName = service.label || service.name;
+                const serviceCategory = service.category;
+                const serviceIcon = getVendorIcon(serviceCategory);
+                
+                return (
+                  <button
+                    key={serviceId}
+                    onClick={() => toggleVendorService(serviceId)}
+                    className={`p-4 rounded-xl text-center transition-all border-2 ${
+                      selectedVendorServices.includes(serviceId)
+                        ? 'border-[#C4A661] bg-[#C4A661] text-white'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-[#C4A661]'
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">{serviceIcon}</div>
+                    <div className="text-sm font-medium">{serviceName}</div>
+                    <div className="text-xs mt-1 opacity-75">{serviceCategory}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
           
@@ -2552,10 +2473,10 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
               <h4 className="font-medium text-gray-900 mb-2">Selected Services ({selectedVendorServices.length})</h4>
               <div className="flex flex-wrap gap-2">
                 {selectedVendorServices.map(serviceId => {
-                  const service = vendorServices.find(s => s.id === serviceId);
+                  const service = vendorServices.find((s: any) => (s.requirement_id || s.id) === serviceId);
                   return service ? (
                     <span key={serviceId} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                      {service.name}
+                      {service.label || service.name}
                     </span>
                   ) : null;
                 })}
@@ -2565,25 +2486,25 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
+              onClick={() => {
+                handleInputChange('selectedVendorServices', selectedVendorServices);
+                setCurrentStep('review');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-gradient-to-r from-[#C4A661] to-[#B8941A] hover:from-[#B8941A] hover:to-[#A67C00] text-white px-8 py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center gap-2"
+            >
+              Continue to Review ({selectedVendorServices.length} selected)
+            </button>
+            <button
               onClick={async () => {
                 handleInputChange('selectedVendorServices', selectedVendorServices);
                 const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
                 await handleSubmit(fakeEvent);
               }}
               disabled={isSubmitting}
-              className="bg-gradient-to-r from-[#C4A661] to-[#B8941A] hover:from-[#B8941A] hover:to-[#A67C00] text-white px-8 py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Creating Event...' : `Create Event with ${selectedVendorServices.length} Services`}
-            </button>
-            <button
-              onClick={async () => {
-                const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-                await handleSubmit(fakeEvent);
-              }}
-              disabled={isSubmitting}
               className="border-2 border-gray-300 hover:border-[#C4A661] text-gray-700 hover:text-[#C4A661] px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Creating...' : 'Create Event Only'}
+              {isSubmitting ? 'Creating...' : 'Create Event Now'}
             </button>
           </div>
         </div>
@@ -2723,12 +2644,6 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       ]
     };
     return eventCities[subsectionId] || eventCities['wedding'];
-  };
-
-  const getStepProgress = () => {
-    const visibleSteps = getVisibleSteps();
-    const currentIndex = getCurrentStepIndex();
-    return `${currentIndex + 1}/${visibleSteps.length}`;
   };
 
   return (

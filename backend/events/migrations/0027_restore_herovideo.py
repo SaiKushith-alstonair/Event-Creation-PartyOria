@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.RunSQL(
-            "INSERT INTO hero_videos (name, video_url, is_active, created_at) VALUES ('PartyOria New Video', '/videos/partyoria-bg.mp4', TRUE, datetime('now'));",
+            "INSERT INTO hero_videos (name, video_url, is_active, created_at) VALUES ('PartyOria New Video', '/videos/partyoria-bg.mp4', TRUE, NOW());",
             reverse_sql="DELETE FROM hero_videos WHERE name = 'PartyOria New Video';"
         ),
     ]

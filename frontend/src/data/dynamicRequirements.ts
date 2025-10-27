@@ -3026,11 +3026,6 @@ const additionalRequirements = {
 
 };
 
-// Merge additional requirements
-Object.assign(eventSpecificRequirements, additionalRequirements);
-
-
-
 // Enhanced event mappings for comprehensive coverage
 const eventMappings: Record<string, string> = {
   // Tree planting variations
@@ -3205,73 +3200,58 @@ const eventMappings: Record<string, string> = {
 };
 
 // Optimized function with better error handling and fallback logic
+
+
 export const getRequirementsForEvent = (eventType: string, subsectionId: string): any => {
   try {
     // Normalize the subsection ID
     const normalizedId = subsectionId.toLowerCase().replace(/[\s-]+/g, '-');
     
+    // Get event-specific requirements only
+    let eventRequirements: any = {};
+    
     // First try exact subsection match
     if (eventSpecificRequirements[subsectionId]) {
-      return eventSpecificRequirements[subsectionId];
-    }
-    
-    // Try normalized ID
-    if (eventSpecificRequirements[normalizedId]) {
-      return eventSpecificRequirements[normalizedId];
-    }
-    
-    // Check event mappings
-    if (eventMappings[normalizedId] && eventSpecificRequirements[eventMappings[normalizedId]]) {
-      return eventSpecificRequirements[eventMappings[normalizedId]];
-    }
-    
-    // Check for partial matches
-    const partialMatch = Object.keys(eventSpecificRequirements).find(key => 
-      normalizedId.includes(key) || key.includes(normalizedId)
-    );
-    
-    if (partialMatch) {
-      return eventSpecificRequirements[partialMatch];
-    }
-    
-    // Keyword-based matching
-    const keywords = {
-      'tree-planting-drive': ['tree', 'plant', 'plantation', 'environmental', 'eco', 'green'],
-      'wedding': ['wedding', 'marriage', 'bridal', 'engagement'],
-      'birthday': ['birthday', 'party', 'celebration'],
-      'conference': ['conference', 'meeting', 'summit'],
-      'seminar': ['seminar', 'workshop', 'training'],
-      'sports-tournament': ['sports', 'tournament', 'competition'],
-      'health-camp': ['health', 'medical', 'wellness'],
-      'online-webinar': ['webinar', 'online', 'virtual']
-    };
-    
-    for (const [eventKey, keywordList] of Object.entries(keywords)) {
-      if (keywordList.some(keyword => normalizedId.includes(keyword))) {
-        return eventSpecificRequirements[eventKey] || getDefaultRequirements();
+      eventRequirements = eventSpecificRequirements[subsectionId];
+    } else if (eventSpecificRequirements[normalizedId]) {
+      eventRequirements = eventSpecificRequirements[normalizedId];
+    } else if (eventMappings[normalizedId] && eventSpecificRequirements[eventMappings[normalizedId]]) {
+      eventRequirements = eventSpecificRequirements[eventMappings[normalizedId]];
+    } else {
+      // Check for partial matches
+      const partialMatch = Object.keys(eventSpecificRequirements).find(key => 
+        normalizedId.includes(key) || key.includes(normalizedId)
+      );
+      
+      if (partialMatch) {
+        eventRequirements = eventSpecificRequirements[partialMatch];
+      } else {
+        // Keyword-based matching
+        const keywords = {
+          'tree-planting-drive': ['tree', 'plant', 'plantation', 'environmental', 'eco', 'green'],
+          'wedding': ['wedding', 'marriage', 'bridal', 'engagement'],
+          'birthday': ['birthday', 'party', 'celebration'],
+          'conference': ['conference', 'meeting', 'summit'],
+          'seminar': ['seminar', 'workshop', 'training'],
+          'sports-tournament': ['sports', 'tournament', 'competition'],
+          'health-camp': ['health', 'medical', 'wellness'],
+          'online-webinar': ['webinar', 'online', 'virtual']
+        };
+        
+        for (const [eventKey, keywordList] of Object.entries(keywords)) {
+          if (keywordList.some(keyword => normalizedId.includes(keyword))) {
+            eventRequirements = eventSpecificRequirements[eventKey] || {};
+            break;
+          }
+        }
       }
     }
     
-    // Return default requirements
-    return getDefaultRequirements();
+    // Return only event-specific requirements, no defaults
+    return eventRequirements;
   } catch (error) {
     console.warn('Error getting requirements for event:', error);
-    return getDefaultRequirements();
+    return {};
   }
 };
 
-// Centralized default requirements function
-const getDefaultRequirements = () => ({
-  'Essential Services': [
-    ...commonRequirements.photography.slice(0, 1),
-    ...commonRequirements.coordination.slice(0, 1),
-    ...commonRequirements.decoration.slice(0, 1)
-  ],
-  'Catering Services': commonRequirements.catering,
-  'Technical Support': commonRequirements.technical,
-  'Support Services': [
-    { id: 'security-services', label: 'Security Services', category: 'other', unit: 'guards', placeholder: 'How many security guards?' },
-    { id: 'transportation', label: 'Transportation', category: 'transportation', unit: 'vehicles', placeholder: 'How many vehicles?' },
-    { id: 'cleanup-services', label: 'Cleanup Services', category: 'other' }
-  ]
-});

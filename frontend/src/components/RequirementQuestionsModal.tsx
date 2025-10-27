@@ -51,18 +51,17 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
   const fetchGalleryImages = async (requirementId: string) => {
     setLoadingImages(true);
     try {
-      // Try to get event name from eventType or eventId
-      const eventName = eventType?.toLowerCase().replace(/\s+/g, '-') || eventId || 'seminar';
+      const eventName = eventId || eventType?.toLowerCase().replace(/\s+/g, '-') || 'conference';
       const response = await fetch(`http://localhost:8000/api/events/requirement-images/?requirement_name=${requirementId}&event_name=${eventName}`);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.images && data.images.length > 0) {
-        setGalleryImages(data.images);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.images && data.images.length > 0) {
+          setGalleryImages(data.images);
+          console.log(`Found ${data.images.length} images for ${requirementId} in ${eventName}`);
+        } else {
+          setGalleryImages([]);
+        }
       } else {
         setGalleryImages([]);
       }
@@ -91,31 +90,37 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
   }, [galleryImages]);
 
   const getFallbackQuestions = (requirementId: string): Question[] => {
-    // Minimal fallback - should rarely be used now
     return [
-      { id: 1, question_text: 'Please specify your requirements', question_type: 'text', placeholder: 'Describe your specific needs', is_required: true, order: 1 },
-      { id: 2, question_text: 'Quantity needed?', question_type: 'number', min_value: 1, max_value: 1000, is_required: true, order: 2 }
+      { id: 1, question_text: 'Quantity needed?', question_type: 'number', min_value: 1, max_value: 100, is_required: true, order: 1 },
+      { id: 2, question_text: 'Special requirements?', question_type: 'text', placeholder: 'Any specific needs', is_required: false, order: 2 }
     ];
   };
 
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        requirement_id: requirement.id
-      });
-      if (eventId) {
-        params.append('event_id', eventId);
-      }
-
-      const response = await fetch(`http://localhost:8000/api/events/requirement-questions/?${params}`);
-      const data = await response.json();
+      // Try multiple approaches to find questions
+      const searchIds = [requirement.id, eventId, eventType?.toLowerCase().replace(/\s+/g, '-')];
       
       let questionsToUse: Question[] = [];
-      if (data.questions && data.questions.length > 0) {
-        questionsToUse = data.questions;
-        console.log(`Loaded ${questionsToUse.length} questions for ${requirement.id}`);
-      } else {
+      
+      for (const searchId of searchIds) {
+        if (!searchId) continue;
+        
+        const params = new URLSearchParams({ requirement_id: searchId });
+        if (eventId) params.append('event_id', eventId);
+        
+        const response = await fetch(`http://localhost:8000/api/events/requirement-questions/?${params}`);
+        const data = await response.json();
+        
+        if (data.questions && data.questions.length > 0) {
+          questionsToUse = data.questions;
+          console.log(`Found ${questionsToUse.length} questions for ${searchId}`);
+          break;
+        }
+      }
+      
+      if (questionsToUse.length === 0) {
         console.warn(`No questions found for ${requirement.id}, using fallback`);
         questionsToUse = getFallbackQuestions(requirement.id);
       }
@@ -123,29 +128,18 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
       setQuestions(questionsToUse);
       const initialAnswers: Record<string, any> = {};
       questionsToUse.forEach((q: Question) => {
-        if (q.question_type === 'checkbox') {
-          initialAnswers[q.id] = [];
-        } else {
-          initialAnswers[q.id] = '';
-        }
+        initialAnswers[q.id] = q.question_type === 'checkbox' ? [] : '';
       });
       setAnswers(initialAnswers);
     } catch (error) {
       console.error('Error fetching questions:', error);
-      // Try fallback questions
       const fallbackQuestions = getFallbackQuestions(requirement.id);
-      if (fallbackQuestions.length > 0) {
-        setQuestions(fallbackQuestions);
-        const initialAnswers: Record<string, any> = {};
-        fallbackQuestions.forEach((q: Question) => {
-          if (q.question_type === 'checkbox') {
-            initialAnswers[q.id] = [];
-          } else {
-            initialAnswers[q.id] = '';
-          }
-        });
-        setAnswers(initialAnswers);
-      }
+      setQuestions(fallbackQuestions);
+      const initialAnswers: Record<string, any> = {};
+      fallbackQuestions.forEach((q: Question) => {
+        initialAnswers[q.id] = q.question_type === 'checkbox' ? [] : '';
+      });
+      setAnswers(initialAnswers);
     } finally {
       setLoading(false);
     }
