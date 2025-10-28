@@ -2737,7 +2737,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                   {currentStep === 'thankyou' && 'Planning choice'}
                   {currentStep === 'tradition' && 'Tradition style'}
                   {currentStep === 'food' && 'Food preferences'}
-                  {currentStep === 'requirements' && 'Special requirements'}
+                  {currentStep === 'requirements' && 'Venues'}
                   {currentStep === 'timeline' && 'Event timeline'}
                   {currentStep === 'venues' && 'Venue selection'}
                   {currentStep === 'vendors' && 'Vendor services'}
@@ -2754,7 +2754,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                 {currentStep === 'thankyou' && 'Thank you for the details!'}
                 {currentStep === 'tradition' && 'Choose your tradition style'}
                 {currentStep === 'food' && 'What are your food preferences?'}
-                {currentStep === 'requirements' && 'Any special requirements?'}
+                {currentStep === 'requirements' && 'Select your venues?'}
                 {currentStep === 'timeline' && 'Plan your event timeline'}
                 {currentStep === 'venues' && 'Select your preferred venues'}
                 {currentStep === 'vendors' && 'Choose your vendor services'}

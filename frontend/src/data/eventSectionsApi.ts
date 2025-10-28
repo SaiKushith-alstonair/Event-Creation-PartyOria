@@ -183,7 +183,7 @@ export const getDynamicRequirementsFromApi = async (eventType: string, subsectio
 
   try {
     // Try to fetch from API first
-    const response = await fetch(`http://localhost:8000/api/events/dynamic-requirements/?event_type=${eventType}&subsection_id=${subsectionId}`);
+    const response = await fetch(`http://127.0.0.1:8000/api/events/dynamic-requirements/?event_type=${eventType}&subsection_id=${subsectionId}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

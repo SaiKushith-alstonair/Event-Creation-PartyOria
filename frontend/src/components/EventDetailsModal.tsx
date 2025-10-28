@@ -77,8 +77,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh]">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Event Details</h2>
@@ -101,7 +101,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
           </div>
         </div>
 
-        <div className="max-h-[80vh] p-6">
+        <div className="max-h-[70vh] overflow-y-auto p-6">
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>

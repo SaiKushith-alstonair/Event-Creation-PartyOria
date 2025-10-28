@@ -7,6 +7,8 @@ from django.http import JsonResponse
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 import logging
+import json
+from typing import Dict, List, Any
 from .models import Event, TraditionStyle, EventSection, EventSubsection, EventImage, EventRequirement, RequirementQuestion, EventRequirementImages, VendorCategory, HeroVideo
 from .serializers import EventSerializer, TraditionStyleSerializer, EventSectionSerializer, EventImageSerializer, EventRequirementSerializer, RequirementQuestionSerializer, VendorCategorySerializer, HeroVideoSerializer
 
@@ -300,12 +302,15 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_requirement_questions(self, request):
         """Get dynamic questions for a specific requirement"""
         requirement_id = request.query_params.get('requirement_id')
+        event_id = request.query_params.get('event_id')
         
         try:
-            # Find requirement by requirement_id
-            requirement = EventRequirement.objects.filter(
-                requirement_id=requirement_id
-            ).first()
+            # Find requirement by requirement_id and event_id
+            filters = {'requirement_id': requirement_id}
+            if event_id:
+                filters['event_id'] = event_id
+            
+            requirement = EventRequirement.objects.filter(**filters).first()
             
             if requirement:
                 # Use the requirement object (foreign key) to find questions
@@ -357,3 +362,149 @@ class EventViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({'images': []}, status=200)
+
+
+class DynamicBudgetAllocator:
+    def __init__(self):
+        self.allocation_rules = {
+            "Corporate Event": {
+                "Audio/Visual Equipment": {"base": 0.15, "per_attendee": 50},
+                "Catering Services": {"base": 0.35, "per_attendee": 200},
+                "Venue": {"base": 0.25, "per_attendee": 100},
+                "Logistics": {"base": 0.15, "per_attendee": 30},
+                "Miscellaneous": {"base": 0.10, "per_attendee": 20}
+            },
+            "Wedding": {
+                "Audio/Visual Equipment": {"base": 0.12, "per_attendee": 80},
+                "Catering Services": {"base": 0.40, "per_attendee": 300},
+                "Venue": {"base": 0.30, "per_attendee": 150},
+                "Logistics": {"base": 0.10, "per_attendee": 40},
+                "Miscellaneous": {"base": 0.08, "per_attendee": 30}
+            },
+            "Birthday Party": {
+                "Audio/Visual Equipment": {"base": 0.10, "per_attendee": 30},
+                "Catering Services": {"base": 0.45, "per_attendee": 150},
+                "Venue": {"base": 0.25, "per_attendee": 80},
+                "Logistics": {"base": 0.10, "per_attendee": 20},
+                "Miscellaneous": {"base": 0.10, "per_attendee": 25}
+            }
+        }
+
+    def allocate_budget(self, event_data, budget_config=None):
+        form_data = event_data.get('form_data', {})
+        selected_services = event_data.get('selected_services', [])
+        
+        total_budget = float(form_data.get('budget', 0))
+        event_type = form_data.get('event_type', 'Corporate Event')
+        attendees = int(form_data.get('attendees', 50))
+        duration = int(form_data.get('duration', 4))
+        
+        rules = budget_config or self.allocation_rules.get(event_type, self.allocation_rules["Corporate Event"])
+        
+        allocation = {}
+        total_allocated = 0
+        
+        for service in selected_services:
+            if service in rules:
+                rule = rules[service]
+                base_amount = total_budget * rule["base"]
+                per_attendee_amount = rule["per_attendee"] * attendees
+                duration_factor = min(duration / 4, 2)
+                
+                service_budget = (base_amount + per_attendee_amount) * duration_factor
+                allocation[service] = round(service_budget, 2)
+                total_allocated += service_budget
+        
+        if total_allocated > total_budget:
+            adjustment_factor = total_budget / total_allocated
+            for service in allocation:
+                allocation[service] = round(allocation[service] * adjustment_factor, 2)
+            total_allocated = sum(allocation.values())
+        
+        remaining = total_budget - total_allocated
+        if remaining > 0:
+            allocation["Contingency"] = round(remaining, 2)
+        
+        return {
+            "total_budget": total_budget,
+            "allocated_budget": allocation,
+            "total_allocated": round(sum(allocation.values()), 2),
+            "event_details": {
+                "event_type": event_type,
+                "attendees": attendees,
+                "duration": duration,
+                "services": selected_services
+            }
+        }
+
+    def get_budget_breakdown(self, allocation_result):
+        breakdown = []
+        allocated_budget = allocation_result.get("allocated_budget", {})
+        total = allocation_result.get("total_budget", 0)
+        
+        for service, amount in allocated_budget.items():
+            percentage = (amount / total * 100) if total > 0 else 0
+            breakdown.append({
+                "service": service,
+                "amount": amount,
+                "percentage": round(percentage, 1)
+            })
+        
+        return sorted(breakdown, key=lambda x: x["amount"], reverse=True)
+
+    @action(detail=False, methods=['post'], url_path='allocate-budget')
+    def allocate_budget(self, request):
+        try:
+            data = request.data
+            event_id = data.get('event_id')
+            custom_config = data.get('budget_config')
+            
+            if not event_id:
+                return Response({'error': 'Event ID is required'}, status=400)
+            
+            event = Event.objects.get(id=event_id)
+            allocator = DynamicBudgetAllocator()
+            
+            event_data = {
+                'form_data': event.form_data,
+                'selected_services': event.selected_services
+            }
+            
+            allocation_result = allocator.allocate_budget(event_data, custom_config)
+            breakdown = allocator.get_budget_breakdown(allocation_result)
+            
+            # Save allocation to database
+            event.budget_allocation = allocation_result
+            event.save()
+            
+            return Response({
+                'success': True,
+                'allocation': allocation_result,
+                'breakdown': breakdown
+            })
+            
+        except Event.DoesNotExist:
+            return Response({'error': 'Event not found'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=False, methods=['get'], url_path='budget-fields')
+    def get_budget_fields(self, request):
+        fields = {
+            "Audio/Visual Equipment": [
+                "Sound System", "Microphones", "Projectors", "Lighting", "Stage Setup"
+            ],
+            "Catering Services": [
+                "Food", "Beverages", "Service Staff", "Utensils", "Setup"
+            ],
+            "Venue": [
+                "Rental Cost", "Decoration", "Seating", "Utilities", "Cleaning"
+            ],
+            "Logistics": [
+                "Transportation", "Coordination", "Security", "Permits"
+            ],
+            "Miscellaneous": [
+                "Photography", "Documentation", "Contingency", "Insurance"
+            ]
+        }
+        return Response(fields)
