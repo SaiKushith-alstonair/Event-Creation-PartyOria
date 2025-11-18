@@ -538,6 +538,12 @@ class QuoteRequest(models.Model):
     selected_vendors = models.JSONField(default=list, help_text='List of specifically selected vendors')
     selected_venues = models.JSONField(default=list, help_text='List of specifically selected venues')
     vendor_responses = models.JSONField(default=dict, help_text='Vendor responses to this quote request')
+    
+    # Category-specific data for targeted quotes
+    category_specific_data = models.JSONField(
+        default=dict, 
+        help_text='Category-specific requirements and budget allocation: {category: {requirements: {}, budget: amount, details: {}}}'
+    )
 
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='quote_requests', null=True, blank=True)
@@ -578,6 +584,97 @@ class QuoteRequest(models.Model):
             return '48 hours' if self.quote_type == 'targeted' else '72 hours'
         else:
             return '72 hours' if self.quote_type == 'targeted' else '5 days'
+    
+    def get_category_data_for_vendor(self, vendor_category):
+        """Get category-specific data for a particular vendor category"""
+        return self.category_specific_data.get(vendor_category, {})
+    
+    def set_category_data(self, category, requirements, budget_amount, additional_details=None):
+        """Set category-specific data for targeted quotes"""
+        if not self.category_specific_data:
+            self.category_specific_data = {}
+        
+        self.category_specific_data[category] = {
+            'requirements': requirements,
+            'budget': float(budget_amount) if budget_amount else 0,
+            'details': additional_details or {},
+            'guest_count': self.guest_count,
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'location': self.location
+        }
+    
+    @classmethod
+    def extract_category_specific_data(cls, event, budget_allocations=None):
+        """
+        Extract category-specific requirements and budget from event data
+        Returns: Dict[category] -> {requirements, budget, details}
+        """
+        # Service to category mapping
+        SERVICE_CATEGORY_MAP = {
+            'catering': ['catering', 'food', 'menu', 'cake', 'cuisine', 'buffet'],
+            'photography': ['photography', 'videography', 'photo', 'video', 'bridal', 'camera'],
+            'decorations': ['decoration', 'decor', 'setup', 'flower', 'balloon', 'mandap'],
+            'entertainment': ['entertainment', 'music', 'dj', 'band', 'dance', 'magic', 'show'],
+            'venues': ['venue', 'hall', 'location', 'space'],
+            'audio_visual': ['audio', 'visual', 'sound', 'microphone', 'projection'],
+            'lighting': ['lighting', 'light', 'led', 'disco']
+        }
+        
+        category_data = {}
+        special_requirements = event.special_requirements or {}
+        
+        # Group requirements by category
+        for req_id, req_data in special_requirements.items():
+            if not isinstance(req_data, dict) or not req_data.get('selected'):
+                continue
+                
+            # Find matching category
+            matched_category = None
+            req_id_lower = req_id.lower()
+            
+            for category, keywords in SERVICE_CATEGORY_MAP.items():
+                if any(keyword in req_id_lower for keyword in keywords):
+                    matched_category = category
+                    break
+            
+            if matched_category:
+                if matched_category not in category_data:
+                    category_data[matched_category] = {
+                        'requirements': {},
+                        'budget': 0,
+                        'details': {}
+                    }
+                
+                # Add requirement data
+                category_data[matched_category]['requirements'][req_id] = {
+                    'selected': req_data.get('selected', True),
+                    'quantity': req_data.get('quantity'),
+                    'unit': req_data.get('unit'),
+                    'questions': req_data.get('questions', []),
+                    'answers': req_data.get('answers', {})
+                }
+        
+        # Add budget allocations if available
+        if budget_allocations:
+            for category, allocation_data in budget_allocations.items():
+                # Map display names back to category keys
+                category_key = None
+                category_lower = category.lower()
+                
+                for cat_key, keywords in SERVICE_CATEGORY_MAP.items():
+                    if any(keyword in category_lower for keyword in keywords) or cat_key in category_lower:
+                        category_key = cat_key
+                        break
+                
+                if category_key and category_key in category_data:
+                    category_data[category_key]['budget'] = float(allocation_data.get('amount', 0))
+                    category_data[category_key]['details'].update({
+                        'percentage': float(allocation_data.get('percentage', 0)),
+                        'per_guest_cost': float(allocation_data.get('per_guest_cost', 0)),
+                        'per_hour_cost': float(allocation_data.get('per_hour_cost', 0))
+                    })
+        
+        return category_data
 
 class VendorQuote(models.Model):
     STATUS_CHOICES = [

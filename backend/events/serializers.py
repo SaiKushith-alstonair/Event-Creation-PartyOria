@@ -155,6 +155,6 @@ class QuoteRequestSerializer(serializers.ModelSerializer):
                  'event_date', 'location', 'guest_count', 'budget_range', 'services', 'description', 
                  'urgency', 'status', 'quote_type', 'expand_vendors', 'is_targeted_quote', 
                  'prefilled_event_id', 'selected_vendors', 'selected_venues', 'source_event',
-                 'user', 'vendor_count', 'venue_count', 'estimated_response_time', 'created_at', 'updated_at']
+                 'category_specific_data', 'user', 'vendor_count', 'venue_count', 'estimated_response_time', 'created_at', 'updated_at']
         read_only_fields = ['id', 'vendor_count', 'venue_count', 'estimated_response_time', 'created_at', 'updated_at']
 

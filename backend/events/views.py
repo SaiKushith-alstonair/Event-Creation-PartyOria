@@ -1147,12 +1147,60 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
         
         # Link to source event if prefilled_event_id is provided
         prefilled_event_id = self.request.data.get('prefilled_event_id')
+        source_event = None
         if prefilled_event_id:
             try:
                 source_event = Event.objects.get(id=prefilled_event_id)
                 save_kwargs['source_event'] = source_event
             except Event.DoesNotExist:
                 pass
+        
+        # Generate category-specific data if this is a targeted quote
+        quote_type = self.request.data.get('quote_type', 'comprehensive')
+        if quote_type == 'targeted' and source_event:
+            # Get budget allocations from the event
+            try:
+                from .budget_algorithm import SmartBudgetAllocator
+                from decimal import Decimal
+                
+                # Get event data
+                form_data = source_event.form_data or {}
+                event_type = form_data.get('event_type') or source_event.event_type
+                attendees = form_data.get('attendees') or source_event.attendees
+                duration = form_data.get('duration') or source_event.duration
+                budget_raw = form_data.get('budget') or source_event.total_budget
+                
+                # Parse duration and budget
+                try:
+                    if isinstance(duration, str) and '-' in duration:
+                        duration = int(duration.split('-')[0])
+                    else:
+                        duration = int(duration)
+                except (ValueError, TypeError):
+                    duration = 4
+                
+                try:
+                    total_budget = Decimal(str(budget_raw))
+                except (ValueError, TypeError):
+                    total_budget = Decimal('200000')
+                
+                # Calculate budget allocation
+                allocation = SmartBudgetAllocator.calculate_smart_allocation(
+                    event_type=event_type,
+                    venue_type=source_event.venue_type,
+                    attendees=attendees,
+                    duration=duration,
+                    total_budget=total_budget,
+                    special_requirements=source_event.special_requirements,
+                    selected_services_list=source_event.selected_services
+                )
+                
+                # Extract category-specific data
+                category_data = QuoteRequest.extract_category_specific_data(source_event, allocation)
+                save_kwargs['category_specific_data'] = category_data
+                
+            except Exception as e:
+                logger.error(f"Error generating category-specific data: {str(e)}")
         
         serializer.save(**save_kwargs)
     
@@ -1224,6 +1272,152 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
         }
         
         return Response(stats)
+    
+    @action(detail=True, methods=['get'], url_path='category-data')
+    def get_category_data(self, request, pk=None):
+        """Get category-specific data for a vendor category"""
+        try:
+            quote_request = self.get_object()
+            vendor_category = request.query_params.get('category')
+            
+            if not vendor_category:
+                return Response(
+                    {'error': 'category parameter is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get category-specific data
+            category_data = quote_request.get_category_data_for_vendor(vendor_category)
+            
+            if not category_data:
+                return Response(
+                    {'message': f'No specific data found for {vendor_category} category'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Format response with only relevant information
+            response_data = {
+                'quote_id': quote_request.id,
+                'event_type': quote_request.event_type,
+                'event_name': quote_request.event_name,
+                'client_name': quote_request.client_name,
+                'event_date': quote_request.event_date,
+                'location': quote_request.location,
+                'guest_count': quote_request.guest_count,
+                'category': vendor_category,
+                'requirements': category_data.get('requirements', {}),
+                'allocated_budget': category_data.get('budget', 0),
+                'budget_details': category_data.get('details', {}),
+                'urgency': quote_request.urgency,
+                'description': quote_request.description
+            }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='vendor-specific')
+    def get_vendor_specific_quotes(self, request):
+        """Get all quotes relevant to a specific vendor category"""
+        vendor_category = request.query_params.get('category')
+        
+        if not vendor_category:
+            return Response(
+                {'error': 'category parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get all targeted quotes that have data for this category
+            quotes = self.get_queryset().filter(
+                quote_type='targeted',
+                category_specific_data__has_key=vendor_category
+            )
+            
+            vendor_quotes = []
+            for quote in quotes:
+                category_data = quote.get_category_data_for_vendor(vendor_category)
+                if category_data:
+                    vendor_quotes.append({
+                        'quote_id': quote.id,
+                        'event_type': quote.event_type,
+                        'event_name': quote.event_name,
+                        'client_name': quote.client_name,
+                        'event_date': quote.event_date,
+                        'location': quote.location,
+                        'guest_count': quote.guest_count,
+                        'allocated_budget': category_data.get('budget', 0),
+                        'requirements_count': len(category_data.get('requirements', {})),
+                        'urgency': quote.urgency,
+                        'status': quote.status,
+                        'created_at': quote.created_at
+                    })
+            
+            return Response({
+                'category': vendor_category,
+                'total_quotes': len(vendor_quotes),
+                'quotes': vendor_quotes
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'], url_path='notify-vendors')
+    def notify_vendors(self, request, pk=None):
+        """Send category-specific notifications to relevant vendors"""
+        try:
+            quote_request = self.get_object()
+            
+            if quote_request.status != 'pending':
+                return Response(
+                    {'error': 'Can only notify vendors for pending quotes'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            from .vendor_notification import VendorNotificationService
+            
+            if quote_request.quote_type == 'targeted':
+                # Send category-specific notifications
+                notification_results = VendorNotificationService.send_targeted_quotes(quote_request)
+                
+                # Update quote status
+                quote_request.status = 'vendors_notified'
+                quote_request.save()
+                
+                total_notified = sum(len(emails) for emails in notification_results.values())
+                
+                return Response({
+                    'message': f'Successfully notified {total_notified} vendors across {len(notification_results)} categories',
+                    'notification_results': notification_results,
+                    'quote_type': 'targeted'
+                })
+            
+            else:
+                # Send comprehensive notifications
+                notified_emails = VendorNotificationService.send_comprehensive_quote(quote_request)
+                
+                # Update quote status
+                quote_request.status = 'vendors_notified'
+                quote_request.save()
+                
+                return Response({
+                    'message': f'Successfully notified {len(notified_emails)} vendors',
+                    'notified_vendors': notified_emails,
+                    'quote_type': 'comprehensive'
+                })
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 import uuid
 from django.utils import timezone
