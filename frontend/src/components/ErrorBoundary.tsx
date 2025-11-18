@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import errorLogger from '../utils/errorLogger';
+
 
 interface Props {
   children: ReactNode;
@@ -29,13 +29,7 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('Component Stack:', errorInfo.componentStack);
     console.groupEnd();
 
-    // Log to our error logger
-    errorLogger.logComponentError(
-      'ErrorBoundary',
-      error,
-      this.props,
-      { errorInfo }
-    );
+
 
     this.setState({ errorInfo });
   }

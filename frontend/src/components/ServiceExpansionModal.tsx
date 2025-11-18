@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, ChevronRight, Check, User } from 'lucide-react';
-import { isSingleProviderCategory, getConsolidatedService } from '../utils/serviceLogic';
+
 
 interface ServiceExpansionModalProps {
   isOpen: boolean;
@@ -53,18 +53,12 @@ const ServiceExpansionModal: React.FC<ServiceExpansionModalProps> = ({
   const handleExploreServices = () => {
     let finalServices = { ...tempSelectedServices };
     
-    // For single provider categories, consolidate selected services
-    if (isSingleProviderCategory(categoryName)) {
-      const consolidatedService = getConsolidatedService(categoryName);
+    // Simple service consolidation
+    const isSingleProvider = ['photography', 'videography', 'catering'].includes(categoryName.toLowerCase());
+    if (isSingleProvider) {
       const selectedSubServices = Object.keys(tempSelectedServices).filter(key => tempSelectedServices[key]?.selected);
-      
-      if (selectedSubServices.length > 0 && consolidatedService) {
-        // Remove individual services and add consolidated service
-        selectedSubServices.forEach(serviceId => {
-          delete finalServices[serviceId];
-        });
-        
-        finalServices[consolidatedService.mainService] = {
+      if (selectedSubServices.length > 0) {
+        finalServices[`${categoryName}-service`] = {
           selected: true,
           subServices: selectedSubServices,
           category: categoryName
@@ -105,26 +99,14 @@ const ServiceExpansionModal: React.FC<ServiceExpansionModalProps> = ({
 
         <div className="p-6">
           <div className="mb-6">
-            <div className={`border rounded-lg p-4 ${
-              isSingleProviderCategory(categoryName) 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-blue-50 border-blue-200'
-            }`}>
+            <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
               <div className="flex items-center gap-2 mb-2">
-                {isSingleProviderCategory(categoryName) && <User className="text-green-600" size={20} />}
-                <h3 className={`font-semibold ${
-                  isSingleProviderCategory(categoryName) ? 'text-green-900' : 'text-blue-900'
-                }`}>
-                  {isSingleProviderCategory(categoryName) ? '👤 Single Provider Service' : '💡 Service Selection'}
+                <h3 className="font-semibold text-blue-900">
+                  💡 Service Selection
                 </h3>
               </div>
-              <p className={`text-sm ${
-                isSingleProviderCategory(categoryName) ? 'text-green-700' : 'text-blue-700'
-              }`}>
-                {isSingleProviderCategory(categoryName) 
-                  ? `One professional can handle all selected ${categoryName.toLowerCase()} types. Select the specific services you need.`
-                  : `Choose the specific ${categoryName.toLowerCase()} services you need for your event. You can specify quantities for better vendor matching and accurate budget planning.`
-                }
+              <p className="text-sm text-blue-700">
+                Choose the specific {categoryName.toLowerCase()} services you need for your event. You can specify quantities for better vendor matching and accurate budget planning.
               </p>
             </div>
           </div>

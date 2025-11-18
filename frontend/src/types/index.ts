@@ -69,17 +69,6 @@ export interface EventFormData {
   
   // Planning Type Tracking
   planningType?: 'detailed' | 'skip';
-  
-  // Budget Allocation (Phase 1)
-  budgetAllocation?: {
-    categories: Record<string, {
-      amount: number;
-      percentage: number;
-      services: string[];
-    }>;
-    totalAllocated: number;
-    method: 'manual' | 'automatic';
-  };
 }
 
 export interface NavigationState {
@@ -111,3 +100,79 @@ export interface ValidationErrors {
   specialInstructions?: string;
   accessibilityNeeds?: string;
 }
+
+export interface Event {
+  id?: number;
+  event_name: string;
+  event_type?: 'corporate' | 'wedding' | 'birthday' | 'festival' | 'other';
+  attendees?: number;
+  venue_type?: 'indoor' | 'outdoor' | 'hybrid';
+  duration?: number;
+  total_budget?: number;
+  services?: string[];
+  form_data: Record<string, any>;
+  special_requirements?: Record<string, any>;
+  selected_services?: string[];
+  budget_allocations?: BudgetAllocation[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BudgetAllocation {
+  id?: number;
+  category: 'catering' | 'venue' | 'decorations' | 'photography' | 'entertainment' | 'other_services' | 'audio_visual' | 'lighting';
+  percentage: number;
+  amount: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BudgetSummary {
+  event: {
+    id: number;
+    name: string;
+    type: string;
+    attendees: number;
+    venue_type: string;
+    duration: number;
+    total_budget: string;
+  };
+  allocations: BudgetAllocation[];
+  summary: {
+    total_allocated: string;
+    remaining_budget: string;
+    efficiency_score: number;
+    allocation_count: number;
+  };
+  has_allocation: boolean;
+}
+
+export interface BudgetAllocationRequest {
+  allocations: Record<string, number>;
+}
+
+export const BUDGET_CATEGORIES = {
+  catering: 'Catering',
+  venue: 'Venue', 
+  decorations: 'Decorations',
+  photography: 'Photography',
+  entertainment: 'Entertainment',
+  other_services: 'Other Services',
+  audio_visual: 'Audio Visual Equipment',
+  lighting: 'Lighting Setup'
+} as const;
+
+export const EVENT_TYPES = {
+  corporate: 'Corporate',
+  wedding: 'Wedding',
+  birthday: 'Birthday',
+  festival: 'Festival',
+  other: 'Other'
+} as const;
+
+export const VENUE_TYPES = {
+  indoor: 'Indoor',
+  outdoor: 'Outdoor',
+  hybrid: 'Hybrid'
+} as const;
+

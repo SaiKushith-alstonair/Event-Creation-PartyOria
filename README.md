@@ -1,57 +1,75 @@
-<<<<<<< HEAD
-# PartyOria Event Management System - Frontend
+# PartyOria - Unified Event Management Platform
 
-A comprehensive event creation platform built with React, TypeScript, and Tailwind CSS, featuring 106+ event types and dynamic vendor management.
+Complete event creation and vendor management system with React frontend and Django backend.
+
+## Quick Start
+
+### One-Command Development Setup
+
+```bash
+# Start both frontend and backend
+start-dev.bat
+```
+
+This will start:
+- **Backend**: http://localhost:8000 (Django API)
+- **Frontend**: http://localhost:3000 (Customer Portal)
+- **Vendor Portal**: http://localhost:3000/vendor
+
+### Manual Setup
+
+#### Backend
+```bash
+cd backend
+start-backend.bat
+```
+
+#### Frontend
+```bash
+cd frontend
+start-frontend.bat
+```
 
 ## Features
 
-- **106+ Event Types**: Complete coverage across 11 major categories
-- **Dynamic Page Rendering**: Only selected event pages are visible
-- **Smart Vendor Mapping**: Context-aware vendor suggestions
-- **Festival Sub-types**: Dynamic filtering for festival celebrations
-- **TypeScript**: Full type safety and better development experience
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **Real-time Validation**: Comprehensive form validation
-- **Search & Filter**: Advanced vendor and event search capabilities
-- **Budget Management**: Support for custom budget ranges over ₹50,000
-- **Tradition Styles**: Wedding, Festival, and Birthday tradition options
-- **Organizer Selection**: Fallback organizer data when API unavailable
+### Customer Portal
+- 106+ event types across 11 categories
+- Dynamic vendor selection
+- Budget management
+- Real-time chat
+- RSVP management
 
-## Getting Started
+### Vendor Portal
+- Vendor registration & verification
+- Service management
+- Booking management
+- Analytics dashboard
+- Customer communication
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+## API Endpoints
 
-2. Start the development server:
-   ```bash
-   npm start
-   ```
+### Customer APIs
+- `/api/` - Event management
+- `/api/auth/` - Authentication
+- `/chat/` - Real-time messaging
 
-3. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Vendor APIs
+- `/api/vendor/` - Vendor management
+- `/api/vendor/auth/` - Vendor authentication
+- `/api/vendor/bookings/` - Booking management
 
-## Backend Integration
+## Tech Stack
 
-This frontend connects to a Django REST API backend. Make sure the backend is running on `http://localhost:8000`.
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
+- **Backend**: Django 4.2 + DRF + PostgreSQL
+- **Real-time**: Socket.IO + Django Channels
+- **Authentication**: JWT + Token-based auth
 
-## Key Components
+## Database Setup
 
-- **EventCreator**: Main container component managing state
-- **FormSteps**: Handles step rendering and navigation
-- **TraditionSelector**: Dynamic tradition styles based on event type
-- **LocationSelector**: State/city selection with search
-- **VendorSelectionModal**: Vendor selection with fallback data
-- **OrganizerSelectionModal**: Organizer selection with fallback data
-- **EventDetailsModal**: Complete event information display
-
-## Recent Updates
-
-- Added fallback tradition styles for wedding, festival, and birthday events
-- Implemented actual budget value storage for "Over ₹50,000" range
-- Added fallback organizer data when API is unavailable
-- Fixed form data clearing for new events while preserving edit functionality
-- Enhanced vendor selection flow after organizer selection
-=======
-# Event-Creation
->>>>>>> 0ba6031c677c59d57f7e0e4dc1ae4c7002a79f59
+Ensure PostgreSQL is running with:
+- Database: `partyoria_db`
+- User: `postgres`
+- Password: `1234`
+- Host: `localhost`
+- Port: `5432`

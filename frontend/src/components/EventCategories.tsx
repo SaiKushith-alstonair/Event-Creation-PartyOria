@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { 
   Briefcase, Heart, Palette, Church, Sparkles, Flag, 
   Trophy, GraduationCap, Activity, Leaf, Monitor
@@ -33,7 +33,7 @@ const EventCategories: React.FC<EventCategoriesProps> = ({
   );
 
   const colors = {
-    'corporate': { bg: 'from-blue-500 to-blue-600', popular: true },
+    'corporate': { bg: 'from-purple-500 to-pink-600', popular: true },
     'social': { bg: 'from-pink-500 to-pink-600', trending: true },
     'cultural': { bg: 'from-purple-500 to-purple-600' },
     'religious': { bg: 'from-indigo-500 to-indigo-600' },
@@ -51,7 +51,7 @@ const EventCategories: React.FC<EventCategoriesProps> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       {filteredSections.map((section: any) => {
-        const categoryConfig = colors[section.id as keyof typeof colors] || { bg: 'from-blue-500 to-blue-600' };
+        const categoryConfig = colors[section.id as keyof typeof colors] || { bg: 'from-purple-500 to-pink-600' };
         
         return (
           <div
@@ -59,7 +59,7 @@ const EventCategories: React.FC<EventCategoriesProps> = ({
             onClick={() => onSectionSelect(section.id)}
             className="group relative bg-gradient-to-br from-white to-gray-50 rounded-3xl p-10 cursor-pointer border-2 border-transparent hover:border-purple-200 shadow-lg hover:shadow-xl min-h-[320px] interactive-card"
           >
-            <div className={`absolute inset-0 bg-gradient-to-br ${categoryConfig.bg} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+
             
             {'popular' in categoryConfig && categoryConfig.popular && (
               <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
@@ -108,4 +108,4 @@ const EventCategories: React.FC<EventCategoriesProps> = ({
   );
 };
 
-export default EventCategories;
+export default memo(EventCategories);

@@ -135,7 +135,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     <div>
                       <span className="text-sm font-medium text-gray-700">Duration: </span>
                       <span className="text-purple-600 font-medium">
-                        {event.duration === 'custom' ? event.custom_duration : event.duration.replace('-', ' ')}
+                        {event.duration === 'custom' ? event.custom_duration : 
+                         typeof event.duration === 'string' ? event.duration.replace('-', ' ') : event.duration}
                       </span>
                     </div>
                   )}
@@ -367,7 +368,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     <div>
                       <span className="font-medium text-gray-700">Duration: </span>
                       <span className="text-gray-900">
-                        {event.form_data.duration === 'custom' ? event.form_data.customDuration : event.form_data.duration.replace('-', ' ')}
+                        {event.form_data.duration === 'custom' ? event.form_data.customDuration : 
+                         typeof event.form_data.duration === 'string' ? event.form_data.duration.replace('-', ' ') : event.form_data.duration}
                       </span>
                     </div>
                   )}

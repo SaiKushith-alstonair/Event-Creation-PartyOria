@@ -1316,9 +1316,11 @@ export const eventSections: EventSection[] = [
           createVendor('Outdoor Venue', 'venue'),
           createVendor('Garden Venue', 'venue'),
           createVendor('Tree Suppliers', 'Services'),
-          createVendor('Tools/Equipment Vendors', 'Services'),
+          createVendor('Nursery Partners', 'Services'),
           createVendor('Landscapers', 'Services'),
-          createVendor('Educators', 'Speaking'),
+          createVendor('Environmental Educators', 'Speaking'),
+          createVendor('Volunteer Coordinators', 'Coordination'),
+          createVendor('Planting Equipment Rental', 'Services'),
         ],
       },
       {

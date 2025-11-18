@@ -64,7 +64,7 @@ class EventTypeViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(grouped_requirements)
 
 class VendorServiceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = VendorService.objects.all().order_by('name')
+    queryset = VendorService.objects.all().order_by('service_name')
     serializer_class = VendorServiceSerializer
 
     @action(detail=False, methods=['get'])

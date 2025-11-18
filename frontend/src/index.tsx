@@ -1,7 +1,18 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import './utils/errorLogger'; // Initialize error logger
+
+// Import test auth for development
+import './utils/testAuth';
+
+// Register service worker
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(() => console.log('SW registration failed'));
+  });
+}
 
 const container = document.getElementById('root');
 if (!container) {

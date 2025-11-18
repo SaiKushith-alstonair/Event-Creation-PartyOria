@@ -14,7 +14,7 @@ html {
 html, body {
   height: 100%;
   margin: 0;
-  background: linear-gradient(135deg, #F5DEB3 0%, #E6C2A6 25%, #D4A574 50%, #C8956D 75%, #B8860B 100%);
+  background: white;
 }
 
 .main-container {
@@ -47,12 +47,79 @@ html, body {
   }
 }
 
+@keyframes gradientShift {
+  0%, 100% {
+    background: linear-gradient(135deg, #1e1b4b 0%, #1e3a8a 50%, #312e81 100%);
+  }
+  33% {
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 50%, #1e3a8a 100%);
+  }
+  66% {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #1e1b4b 100%);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-10px) translateX(-10px);
+    opacity: 0.4;
+  }
+  75% {
+    transform: translateY(-30px) translateX(5px);
+    opacity: 0.7;
+  }
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bounceSlow {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.02);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
 
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+
+.animate-gradient-shift {
+  animation: gradientShift 8s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 8s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 4s ease-in-out infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 6s ease-in-out infinite;
 }
 
 
@@ -123,6 +190,21 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Landing page specific background */
+.main-container {
+  position: relative;
+  overflow-x: hidden;
+}
+
 /* Responsive utilities */
 @media (max-width: 640px) {
   .mobile-padding {
@@ -182,7 +264,7 @@ html, body {
 
 /* Simplified Gradient Background - Better Performance */
 .gradient-background {
-  background: linear-gradient(135deg, #F5DEB3 0%, #E6C2A6 25%, #D4A574 50%, #C8956D 75%, #B8860B 100%);
+  background: linear-gradient(45deg, #0e1938, #6b41bf, #f359d2, #ffc2c3);
   position: relative;
   min-height: 100vh;
 }
@@ -204,7 +286,7 @@ html, body {
 
 /* Simplified Event Category Background */
 .event-categories-page {
-  background: linear-gradient(135deg, #F5DEB3 0%, #E6C2A6 25%, #D4A574 50%, #C8956D 75%, #B8860B 100%);
+  background: linear-gradient(45deg, #0e1938, #6b41bf, #f359d2, #ffc2c3);
   position: relative;
   min-height: 100vh;
 }
@@ -225,44 +307,15 @@ html, body {
 
 /* Simplified Corporate Events Background */
 .corporate-events-grid {
-  background: linear-gradient(135deg, #F5DEB3 0%, #E6C2A6 25%, #D4A574 50%, #C8956D 75%, #B8860B 100%);
+  background: white;
   position: relative;
   min-height: 100vh;
-}
-
-.corporate-events-grid::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle 100px at 30% 40%, rgba(255, 255, 255, 0.25) 0%, transparent 50%),
-    radial-gradient(circle 80px at 70% 60%, rgba(255, 192, 203, 0.2) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
 }
 
 /* Simplified Conference Form Background */
 .conference-form-page {
-  background: linear-gradient(135deg, #F5DEB3 0%, #E6C2A6 25%, #D4A574 50%, #C8956D 75%, #B8860B 100%);
   position: relative;
   min-height: 100vh;
-}
-
-.conference-form-page::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle 120px at 35% 40%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
-    radial-gradient(circle 90px at 65% 60%, rgba(255, 192, 203, 0.25) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
 }
 
 /* Ensure content stays above background */
@@ -316,7 +369,7 @@ body,
 
 /* Romantic Theme Elements */
 .romantic-theme {
-  background: linear-gradient(135deg, var(--theme-bg) 0%, #F9F1E7 100%);
+  background: linear-gradient(45deg, #0e1938, #6b41bf, #f359d2, #ffc2c3);
   position: relative;
 }
 

@@ -7,21 +7,16 @@ import { eventStorage } from '../utils/localStorage';
 
 import OrganizerSelectionModal from './OrganizerSelectionModal';
 import EventDetailsModal from './EventDetailsModal';
-import BudgetAllocationModal, { BudgetAllocation } from './BudgetAllocationModal';
 import ServiceExpansionModal from './ServiceExpansionModal';
 import LocationSelector from './LocationSelector';
 import TraditionSelector from './TraditionSelector';
 import Breadcrumb from './Breadcrumb';
 import RequirementQuestionsModal from './RequirementQuestionsModal';
+import { LoadingSpinner, PageLoading, EmptyState, ErrorState, FieldError } from './ui/LoadingStates';
 
-import { getEventTheme } from '../utils/eventThemes';
-import { applyTheme, updateHeading, initializeTheming } from '../utils/dynamicEventThemes';
-
-
-import { getRequirementsForEvent } from '../data/dynamicRequirements';
-import { isSingleProviderCategory, getConsolidatedService } from '../utils/serviceLogic';
-import { getEventSectionsFromApi, getEventImagesFromApi, getEventRequirementsFromApi, getDynamicRequirementsFromApi } from '../data/eventSectionsApi';
+// Removed unused imports for deleted files
 import { getEventImage } from '../data/eventImages';
+import "../styles/design-system.css";
 
 type FormStep = 'basic' | 'thankyou' | 'location' | 'duration' | 'budget' | 'tradition' | 'food' | 'requirements' | 'timeline' | 'venues' | 'vendors' | 'review' | 'success';
 
@@ -75,11 +70,9 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showOrganizerModal, setShowOrganizerModal] = useState(false);
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<{name: string; icon: string; services: any[]} | null>(null);
   const [createdEventData, setCreatedEventData] = useState<any>(null);
-  const [budgetAllocation, setBudgetAllocation] = useState<BudgetAllocation | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -89,8 +82,30 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const [showRequirementModal, setShowRequirementModal] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<{id: string; label: string} | null>(null);
 
+  // State declarations that need to be available early
+  const [selectedVenueTypes, setSelectedVenueTypes] = useState<string[]>([]);
+  const [selectedVendorServices, setSelectedVendorServices] = useState<string[]>([]);
+  const [apiRequirements, setApiRequirements] = useState<any>({});
+  const [requirementsLoaded, setRequirementsLoaded] = useState(false);
+  const [states, setStates] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [traditions, setTraditions] = useState<any[]>([]);
+  const [loadingTraditions, setLoadingTraditions] = useState(false);
+  const [isCustomBudget, setIsCustomBudget] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [apiVendorServices, setApiVendorServices] = useState<any[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
+
   const section = apiSections.find((s: any) => s.id === sectionId) || eventSections.find((s: any) => s.id === sectionId);
   const subsection = section?.subsections.find((s: any) => s.id === subsectionId);
+  
+  // Debug logging
+  console.log('Section lookup:', { sectionId, subsectionId, section: section?.name, subsection: subsection?.name });
+  console.log('Event type mapping - sectionId:', sectionId, 'will be mapped to backend event_type');
 
   const steps: { id: FormStep; title: string; icon: React.ReactNode }[] = [
     { id: 'basic', title: 'Basic Details', icon: <Users size={20} /> },
@@ -179,27 +194,15 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
 
   useEffect(() => {
     const loadEventData = async () => {
-      // Apply theme based on current subsection
       if (subsectionId) {
-        console.log('Applying theme for:', subsectionId);
-        applyTheme(subsectionId);
-        updateHeading(subsectionId);
+        console.log('Event type:', subsectionId);
       }
       
-      // Load API data first
-      try {
-        const [sections, images] = await Promise.all([
-          getEventSectionsFromApi(),
-          getEventImagesFromApi()
-        ]);
-        setApiSections(sections);
-        setApiImages(images);
-      } catch (error) {
-        console.warn('Failed to load API data, using fallback:', error);
-      }
+      setApiSections(eventSections);
+      setApiImages({});
 
-      // Load states from API
-      await loadStates();
+      // Defer heavy API calls
+      setTimeout(() => loadStates(), 100);
 
       if (editEventId) {
         try {
@@ -231,8 +234,17 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           console.warn('Failed to load event from API:', error);
         }
       } else {
+        // For new events, ensure we get the correct event name based on subsectionId
+        let correctEventName = subsection?.name || '';
+        
+        // Fallback: if subsection name is wrong, use subsectionId to determine correct name
+        if (subsectionId === 'conference') {
+          correctEventName = 'Conference';
+        }
+        
+        console.log('Setting event name for new event:', correctEventName, 'subsectionId:', subsectionId, 'subsection:', subsection);
         setFormData({
-          eventName: subsection?.name || '',
+          eventName: correctEventName,
           clientName: '',
           clientEmail: '',
           clientPhone: '',
@@ -327,12 +339,9 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
     
-    // Apply theme when event name changes
+    // Theme change removed (files deleted)
     if (field === 'eventName' && value) {
-      const eventType = value.toLowerCase().replace(/\s+/g, '-');
-      console.log('Changing theme to:', eventType);
-      applyTheme(eventType);
-      updateHeading(eventType);
+      console.log('Event name changed to:', value);
     }
   };
 
@@ -344,7 +353,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       if (!formData.clientName.trim()) stepErrors.clientName = 'Client name is required';
       if (!formData.clientEmail.trim()) stepErrors.clientEmail = 'Email is required';
       if (!formData.clientPhone.trim()) stepErrors.clientPhone = 'Phone is required';
-      if (!formData.attendees || formData.attendees <= 0) stepErrors.attendees = 'Attendees required';
+      if (!formData.attendees || formData.attendees <= 0) stepErrors.attendees = 'Valid number of attendees required (minimum 1)';
     } else if (currentStep === 'location') {
       if (!formData.state.trim()) stepErrors.venue = 'State is required';
       if (!formData.city.trim()) stepErrors.venue = 'City is required';
@@ -352,7 +361,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       if (!formData.dateTime) stepErrors.dateTime = 'Date & time is required';
       if (!formData.duration) stepErrors.duration = 'Duration is required';
     } else if (currentStep === 'budget') {
-      if (!formData.budget || formData.budget <= 0) stepErrors.budget = 'Budget is required';
+      if (!formData.budget || formData.budget <= 0) stepErrors.budget = 'Valid budget amount required (minimum ₹1)';
     } else if (currentStep === 'thankyou') {
       // Planning choice step - no validation needed
     } else if (currentStep === 'tradition') {
@@ -378,7 +387,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       setCurrentStep('thankyou');
     } else {
       const visibleSteps = getVisibleSteps();
-      const currentIndex = getCurrentStepIndex();
+      const currentIndex = visibleSteps.findIndex(step => step.id === currentStep);
       
       if (currentIndex >= 0 && currentIndex < visibleSteps.length - 1) {
         setCurrentStep(visibleSteps[currentIndex + 1].id);
@@ -400,18 +409,13 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       setCurrentStep('budget');
     } else {
       const visibleSteps = getVisibleSteps();
-      const currentIndex = getCurrentStepIndex();
+      const currentIndex = visibleSteps.findIndex(step => step.id === currentStep);
       
       if (currentIndex > 0) {
         const prevStep = visibleSteps[currentIndex - 1];
         setCurrentStep(prevStep.id);
         
-        // Remove current step from completed steps when going back
-        setCompletedSteps(prev => {
-          const newCompleted = new Set(prev);
-          newCompleted.delete(currentStep);
-          return newCompleted;
-        });
+        // Don't remove completed steps when going back to preserve form state
       }
     }
     
@@ -448,6 +452,11 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('=== HANDLE SUBMIT STARTED ===');
+    console.log('Form data at submit:', formData);
+    console.log('Selected venue types:', selectedVenueTypes);
+    console.log('Selected vendor services:', selectedVendorServices);
+    
     // Basic validation for required fields
     const stepErrors: ValidationErrors = {};
     if (!formData.eventName.trim()) stepErrors.eventName = 'Event name is required';
@@ -458,11 +467,12 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     if (!formData.city.trim()) stepErrors.venue = 'City is required';
     if (!formData.dateTime) stepErrors.dateTime = 'Date & time is required';
     if (!formData.duration) stepErrors.duration = 'Duration is required';
-    if (!formData.budget || formData.budget <= 0) stepErrors.budget = 'Budget is required';
+    if (!formData.budget || formData.budget <= 0) stepErrors.budget = 'Valid budget amount required (minimum ₹1)';
     
     setErrors(stepErrors);
     
     if (Object.keys(stepErrors).length > 0) {
+      console.log('Validation errors:', stepErrors);
       alert('Please fill in all required fields before creating the event.');
       return;
     }
@@ -472,41 +482,77 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     try {
       const { apiService, convertFormDataToApiEvent } = await import('../services/api');
       
-      // Include venue and vendor selections in form data
+      // Include venue and vendor selections in form data - ensure we get the latest values
+      const finalVenueTypes = (formData.selectedVenueTypes?.length || 0) > 0 ? formData.selectedVenueTypes : selectedVenueTypes || [];
+      const finalVendorServices = (formData.selectedVendorServices?.length || 0) > 0 ? formData.selectedVendorServices : selectedVendorServices || [];
+      
       const updatedFormData = {
         ...formData,
-        selectedVenueTypes,
-        selectedVendorServices
+        selectedVenueTypes: finalVenueTypes,
+        selectedVendorServices: finalVendorServices
       };
       
+      console.log('=== VENUE & VENDOR SELECTION CHECK ===');
+      console.log('formData.selectedVenueTypes:', formData.selectedVenueTypes);
+      console.log('selectedVenueTypes state:', selectedVenueTypes);
+      console.log('finalVenueTypes:', finalVenueTypes);
+      console.log('formData.selectedVendorServices:', formData.selectedVendorServices);
+      console.log('selectedVendorServices state:', selectedVendorServices);
+      console.log('finalVendorServices:', finalVendorServices);
+      
+      console.log('=== FORM DATA PROCESSING ===');
       console.log('Creating event with data:', updatedFormData);
+      console.log('Section ID (event type):', sectionId, 'Subsection ID:', subsectionId);
+      console.log('Final venue types (length:', updatedFormData.selectedVenueTypes?.length || 0, '):', updatedFormData.selectedVenueTypes);
+      console.log('Final vendor services (length:', updatedFormData.selectedVendorServices?.length || 0, '):', updatedFormData.selectedVendorServices);
       
       const apiEvent = convertFormDataToApiEvent(updatedFormData, sectionId, subsectionId);
       
-      console.log('API Event payload:', apiEvent);
+      console.log('=== API EVENT PAYLOAD ===');
+      console.log('API Event payload:', JSON.stringify(apiEvent, null, 2));
+      console.log('Mapped event_type:', apiEvent.event_type);
+      console.log('Services array:', apiEvent.services);
+      console.log('Services length:', apiEvent.services?.length);
+      console.log('Venue types in API event:', apiEvent.selectedVenueTypes);
+      console.log('Vendor services in API event:', apiEvent.selectedVendorServices);
+      
+      // Check authentication before API call
+      const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      console.log('=== AUTHENTICATION CHECK ===');
+      console.log('Has access token:', !!accessToken);
+      console.log('Token preview:', accessToken?.substring(0, 30) + '...');
       
       let savedEvent;
       if (editEventId) {
+        console.log('=== UPDATING EVENT ===');
         savedEvent = await apiService.updateEvent(parseInt(editEventId), apiEvent);
         console.log('Event updated successfully:', savedEvent);
         setCurrentStep('success');
       } else {
+        console.log('=== CREATING NEW EVENT ===');
         savedEvent = await apiService.createEvent(apiEvent);
         console.log('Event created successfully:', savedEvent);
         setCurrentStep('success');
-        // Don't auto-redirect, let user choose
       }
-    } catch (error: any) {
-      console.error('Error saving event:', error);
-      const errorMessage = error?.message || 'Unknown error occurred';
+    } catch (error: unknown) {
+      console.error('=== ERROR SAVING EVENT ===');
+      console.error('Full error object:', error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       alert(`Error ${editEventId ? 'updating' : 'creating'} event: ${errorMessage}\n\nPlease check the console for more details and ensure the backend server is running.`);
     } finally {
       setIsSubmitting(false);
+      console.log('=== HANDLE SUBMIT FINISHED ===');
     }
   };
 
   if (!section || !subsection) {
-    return <div>Event not found</div>;
+    React.useEffect(() => {
+      onBack();
+    }, []);
+    
+    return <PageLoading message="Redirecting to event selection..." />;
   }
 
   const renderProgressBar = () => (
@@ -550,119 +596,81 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            Event Name <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Event Name <span className="text-error-600">*</span>
           </label>
           <input
             type="text"
             value={formData.eventName}
             onChange={(e) => handleInputChange('eventName', e.target.value)}
-            className={`w-full border-2 rounded-2xl px-5 py-4 bg-white/80 backdrop-blur-sm transition-all duration-300 font-medium ${
-              errors.eventName 
-                ? 'border-red-400 bg-red-50/80 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                : 'border-purple-200 focus:border-transparent focus:ring-4 focus:ring-purple-100 focus:bg-white focus:shadow-lg hover:border-purple-300'
-            }`}
-            placeholder="Virtual Conference"
-            style={{
-              background: errors.eventName ? undefined : 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #667eea, #764ba2, #f093fb) border-box'
-            }}
+            className={`input-field ${errors.eventName ? 'border-error-500 bg-error-50' : 'border-gray-300'}`}
+            placeholder={`Enter ${subsection?.name.toLowerCase()} name`}
           />
-          {errors.eventName && (
-            <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-              <span>⚠️</span> {errors.eventName}
-            </p>
-          )}
+          {errors.eventName && <FieldError message={errors.eventName} />}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            Your Name <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Your Name <span className="text-error-600">*</span>
           </label>
           <input
             type="text"
             value={formData.clientName}
             onChange={(e) => handleInputChange('clientName', e.target.value)}
-            className={`w-full border-2 rounded-2xl px-5 py-4 bg-white/80 backdrop-blur-sm transition-all duration-300 font-medium ${
-              errors.clientName 
-                ? 'border-red-400 bg-red-50/80 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                : 'border-purple-200 focus:border-transparent focus:ring-4 focus:ring-purple-100 focus:bg-white focus:shadow-lg hover:border-purple-300'
-            }`}
-            placeholder="Enter your name"
+            className={`input-field ${errors.clientName ? 'border-error-500 bg-error-50' : 'border-gray-300'}`}
+            placeholder="Enter your full name"
           />
-          {errors.clientName && (
-            <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-              <span>⚠️</span> {errors.clientName}
-            </p>
-          )}
+          {errors.clientName && <FieldError message={errors.clientName} />}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            Email Address <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email Address <span className="text-error-600">*</span>
           </label>
           <input
             type="email"
             value={formData.clientEmail}
             onChange={(e) => handleInputChange('clientEmail', e.target.value)}
-            className={`w-full border-2 rounded-2xl px-5 py-4 bg-white/80 backdrop-blur-sm transition-all duration-300 font-medium ${
-              errors.clientEmail 
-                ? 'border-red-400 bg-red-50/80 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                : 'border-purple-200 focus:border-transparent focus:ring-4 focus:ring-purple-100 focus:bg-white focus:shadow-lg hover:border-purple-300'
-            }`}
-            placeholder="Enter your email"
+            className={`input-field ${errors.clientEmail ? 'border-error-500 bg-error-50' : 'border-gray-300'}`}
+            placeholder="your@email.com"
           />
-          {errors.clientEmail && (
-            <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-              <span>⚠️</span> {errors.clientEmail}
-            </p>
-          )}
+          {errors.clientEmail && <FieldError message={errors.clientEmail} />}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            Phone Number <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Phone Number <span className="text-error-600">*</span>
           </label>
           <input
             type="tel"
             value={formData.clientPhone}
             onChange={(e) => handleInputChange('clientPhone', e.target.value)}
-            className={`w-full border-2 rounded-2xl px-5 py-4 bg-white/80 backdrop-blur-sm transition-all duration-300 font-medium ${
-              errors.clientPhone 
-                ? 'border-red-400 bg-red-50/80 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                : 'border-purple-200 focus:border-transparent focus:ring-4 focus:ring-purple-100 focus:bg-white focus:shadow-lg hover:border-purple-300'
-            }`}
-            placeholder="Enter phone number"
+            className={`input-field ${errors.clientPhone ? 'border-error-500 bg-error-50' : 'border-gray-300'}`}
+            placeholder="+91 98765 43210"
           />
-          {errors.clientPhone && (
-            <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-              <span>⚠️</span> {errors.clientPhone}
-            </p>
-          )}
+          {errors.clientPhone && <FieldError message={errors.clientPhone} />}
         </div>
 
 
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            Expected Attendees <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Expected Attendees <span className="text-error-600">*</span>
           </label>
           <input
             type="number"
             value={formData.attendees || ''}
-            onChange={(e) => handleInputChange('attendees', parseInt(e.target.value) || 0)}
-            className={`w-full border-2 rounded-2xl px-5 py-4 bg-white/80 backdrop-blur-sm transition-all duration-300 font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-              errors.attendees 
-                ? 'border-red-400 bg-red-50/80 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
-                : 'border-purple-200 focus:border-transparent focus:ring-4 focus:ring-purple-100 focus:bg-white focus:shadow-lg hover:border-purple-300'
-            }`}
-            placeholder="Number of guests"
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              if (value >= 0 || e.target.value === '') {
+                handleInputChange('attendees', value || 0);
+              }
+            }}
+            className={`input-field ${errors.attendees ? 'border-error-500 bg-error-50' : 'border-gray-300'}`}
+            placeholder="50"
             min="1"
           />
-          {errors.attendees && (
-            <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-              <span>⚠️</span> {errors.attendees}
-            </p>
-          )}
+          {errors.attendees && <FieldError message={errors.attendees} />}
         </div>
       </div>
     </div>
@@ -1033,8 +1041,10 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
               type="number"
               value={formData.budget || ''}
               onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
-                handleInputChange('budget', value);
+                const value = parseInt(e.target.value);
+                if (value >= 0 || e.target.value === '') {
+                  handleInputChange('budget', value || 0);
+                }
               }}
               placeholder="Enter your custom budget"
               className="w-full mt-3 py-3 px-4 rounded-xl border-2 border-gray-300 focus:border-[#C4A661] focus:ring-2 focus:ring-[#C4A661] focus:ring-opacity-20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -1049,23 +1059,6 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     );
   };
 
-  const [selectedVenueTypes, setSelectedVenueTypes] = useState<string[]>([]);
-  const [selectedVendorServices, setSelectedVendorServices] = useState<string[]>([]);
-  const [apiRequirements, setApiRequirements] = useState<any>({});
-  const [requirementsLoaded, setRequirementsLoaded] = useState(false);
-  const [states, setStates] = useState<string[]>([]);
-  const [cities, setCities] = useState<string[]>([]);
-  const [loadingStates, setLoadingStates] = useState(false);
-  const [loadingCities, setLoadingCities] = useState(false);
-  const [traditions, setTraditions] = useState<any[]>([]);
-  const [loadingTraditions, setLoadingTraditions] = useState(false);
-  const [isCustomBudget, setIsCustomBudget] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [apiVendorServices, setApiVendorServices] = useState<any[]>([]);
-  const [loadingVendors, setLoadingVendors] = useState(false);
-  
   // Debug traditions state
   useEffect(() => {
     console.log('Traditions state updated:', traditions.length, 'items:', traditions);
@@ -1075,6 +1068,33 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep]);
+
+  // Sync venue and vendor selections between state and form data
+  useEffect(() => {
+    if (formData.selectedVenueTypes && formData.selectedVenueTypes.length > 0 && selectedVenueTypes.length === 0) {
+      setSelectedVenueTypes(formData.selectedVenueTypes);
+      console.log('Syncing venue types from formData to state:', formData.selectedVenueTypes);
+    }
+    if (formData.selectedVendorServices && formData.selectedVendorServices.length > 0 && selectedVendorServices.length === 0) {
+      setSelectedVendorServices(formData.selectedVendorServices);
+      console.log('Syncing vendor services from formData to state:', formData.selectedVendorServices);
+    }
+  }, [formData.selectedVenueTypes, formData.selectedVendorServices, selectedVenueTypes.length, selectedVendorServices.length]);
+
+  // Update form data when state changes
+  useEffect(() => {
+    if (selectedVenueTypes.length > 0 && (!formData.selectedVenueTypes || formData.selectedVenueTypes.length === 0)) {
+      handleInputChange('selectedVenueTypes', selectedVenueTypes);
+      console.log('Updating formData with venue types from state:', selectedVenueTypes);
+    }
+  }, [selectedVenueTypes]);
+
+  useEffect(() => {
+    if (selectedVendorServices.length > 0 && (!formData.selectedVendorServices || formData.selectedVendorServices.length === 0)) {
+      handleInputChange('selectedVendorServices', selectedVendorServices);
+      console.log('Updating formData with vendor services from state:', selectedVendorServices);
+    }
+  }, [selectedVendorServices]);
 
   const getVenueTypesForEvent = () => {
     const eventName = subsection?.name || '';
@@ -1340,11 +1360,13 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     const venueTypes = getVenueTypesForEvent();
     
     const toggleVenueType = (venueId: string) => {
-      setSelectedVenueTypes(prev => 
-        prev.includes(venueId) 
-          ? prev.filter(id => id !== venueId)
-          : [...prev, venueId]
-      );
+      const newVenueTypes = selectedVenueTypes.includes(venueId) 
+        ? selectedVenueTypes.filter(id => id !== venueId)
+        : [...selectedVenueTypes, venueId];
+      
+      setSelectedVenueTypes(newVenueTypes);
+      handleInputChange('selectedVenueTypes', newVenueTypes);
+      console.log('Venue type toggled:', venueId, 'New selection:', newVenueTypes);
     };
     
     return (
@@ -1383,13 +1405,13 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           </div>
           
           {selectedVenueTypes.length > 0 && (
-            <div className="mb-6 p-4 bg-white rounded-lg border border-blue-300">
+            <div className="mb-6 p-4 bg-white rounded-lg border border-purple-300">
               <h4 className="font-medium text-gray-900 mb-2">Selected Venue Types ({selectedVenueTypes.length})</h4>
               <div className="flex flex-wrap gap-2">
                 {selectedVenueTypes.map(venueId => {
                   const venue = venueTypes.find(v => v.id === venueId);
                   return venue ? (
-                    <span key={venueId} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    <span key={venueId} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
                       {venue.name}
                     </span>
                   ) : null;
@@ -1401,7 +1423,11 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => {
-                handleInputChange('selectedVenueTypes', selectedVenueTypes);
+                // Ensure venue types are properly stored before continuing
+                const finalVenueTypes = selectedVenueTypes.length > 0 ? selectedVenueTypes : formData.selectedVenueTypes || [];
+                handleInputChange('selectedVenueTypes', finalVenueTypes);
+                setSelectedVenueTypes(finalVenueTypes);
+                console.log('Continue to vendors - storing venue types:', finalVenueTypes);
                 setCurrentStep('vendors');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -1411,9 +1437,39 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             </button>
             <button
               onClick={async () => {
-                handleInputChange('selectedVenueTypes', selectedVenueTypes);
-                const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-                await handleSubmit(fakeEvent);
+                console.log('Skip venues button clicked - selectedVenueTypes:', selectedVenueTypes);
+                console.log('Current formData before submit:', formData);
+                
+                try {
+                  // Ensure venue types are stored in form data and state
+                  const updatedFormData = {
+                    ...formData,
+                    selectedVenueTypes: selectedVenueTypes.length > 0 ? selectedVenueTypes : formData.selectedVenueTypes || [],
+                    selectedVendorServices: [] // Empty since we're skipping vendors
+                  };
+                  
+                  // Update both form data and input change to ensure persistence
+                  setFormData(updatedFormData);
+                  handleInputChange('selectedVenueTypes', updatedFormData.selectedVenueTypes);
+                  handleInputChange('selectedVendorServices', []);
+                  
+                  console.log('Updated form data with venues:', updatedFormData);
+                  console.log('Final selectedVenueTypes:', updatedFormData.selectedVenueTypes);
+                  console.log('Authentication check:', {
+                    hasAccessToken: !!localStorage.getItem('access_token'),
+                    hasSessionToken: !!sessionStorage.getItem('access_token'),
+                    tokenPreview: localStorage.getItem('access_token')?.substring(0, 20)
+                  });
+                  
+                  // Wait a moment for state to update
+                  setTimeout(async () => {
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                    await handleSubmit(fakeEvent);
+                  }, 200);
+                } catch (error: unknown) {
+                  console.error('Skip venues error:', error);
+                  alert(`Error creating event: ${error instanceof Error ? error.message : String(error)}`);
+                }
               }}
               disabled={isSubmitting}
               className="border-2 border-gray-300 hover:border-[#C4A661] text-gray-700 hover:text-[#C4A661] px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
@@ -1535,7 +1591,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     if (loadingTraditions) {
       return (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C4A661] mx-auto"></div>
+          <LoadingSpinner size="lg" />
           <p className="mt-2 text-gray-600">Loading tradition styles...</p>
         </div>
       );
@@ -1566,9 +1622,11 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-3">Tradition & Style</label>
           <p className="text-sm text-gray-600 mb-4">Choose a style that matches your vision for this {subsection?.name.toLowerCase()}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {traditions.map(style => (
+            {traditions.filter((style, index, self) => 
+              index === self.findIndex(s => s.style_name === style.style_name)
+            ).map(style => (
               <button
-                key={style.id}
+                key={`${style.id}-${style.style_name}`}
                 type="button"
                 onClick={() => {
                   const newValue = formData.traditionStyle === style.style_name ? '' : style.style_name;
@@ -1595,8 +1653,8 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             </div>
           )}
           
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-800 text-sm">
+          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <p className="text-purple-800 text-sm">
               💡 <strong>Tip:</strong> You can skip this step if you don't have a specific tradition preference.
             </p>
           </div>
@@ -1665,11 +1723,9 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       const loadRequirements = async () => {
         setRequirementsLoaded(false);
         try {
-          // Fetch requirements directly from database
           const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`);
           const dbRequirements = await response.json();
           
-          // Group by category_name
           const grouped = dbRequirements.reduce((acc: Record<string, any[]>, req: any) => {
             if (!acc[req.category_name]) acc[req.category_name] = [];
             acc[req.category_name].push({
@@ -1684,13 +1740,12 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           
           setApiRequirements(grouped);
         } catch (error) {
-          console.error('Error loading requirements:', error);
-          setApiRequirements(getRequirementsForEvent(sectionId, subsectionId));
+          setApiRequirements(getDefaultRequirements());
         } finally {
           setRequirementsLoaded(true);
         }
       };
-      loadRequirements();
+      setTimeout(() => loadRequirements(), 50);
     }
     
     if (currentStep === 'tradition') {
@@ -1725,7 +1780,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     if (!requirementsLoaded) {
       return (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500 mx-auto"></div>
+          <LoadingSpinner size="lg" />
           <p className="mt-2 text-gray-600">Loading requirements...</p>
         </div>
       );
@@ -1734,7 +1789,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     // Get requirements directly from database via API
     let requirements: Record<string, any[]> = {};
     try {
-      const allRequirements = Object.keys(apiRequirements).length > 0 ? apiRequirements : getRequirementsForEvent(sectionId, subsectionId);
+      const allRequirements = Object.keys(apiRequirements).length > 0 ? apiRequirements : getDefaultRequirements();
       console.log('Database requirements loaded:', allRequirements);
       
       // Filter out Vendor Services and structure the data
@@ -1762,10 +1817,10 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         </div>
         
         {Object.keys(requirements).length === 0 ? (
-          <div className="text-center py-8 bg-[#FFF9E6] rounded-xl border border-[#E5D5A3]">
-            <p className="text-[#8B7355] mb-4">No specific requirements found for this event type.</p>
-            <p className="text-sm text-gray-600">You can add custom requirements below or continue to the next step.</p>
-          </div>
+          <EmptyState
+            title="No specific requirements found"
+            description="You can add custom requirements below or continue to the next step."
+          />
         ) : (
           <div className="space-y-4">
             {Object.entries(requirements).map(([categoryName, services]) => {
@@ -1922,7 +1977,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         </div>
         
         {/* Timeline Builder */}
-        <div className="bg-blue-50 rounded-xl p-6">
+        <div className="bg-purple-50 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">⏰ Event Schedule</h3>
             <button
@@ -2085,7 +2140,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             <h3 className="font-semibold text-gray-900 mb-2">Selected Venue Types</h3>
             <div className="flex flex-wrap gap-2">
               {formData.selectedVenueTypes.map(venue => (
-                <span key={venue} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span key={venue} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
                   {venue.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </span>
               ))}
@@ -2114,8 +2169,8 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                 if (typeof value === 'object' && value && (value as any).requirementLabel) {
                   const reqData = value as any;
                   return (
-                    <div key={key} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <h4 className="font-medium text-blue-900 mb-2">{reqData.requirementLabel}</h4>
+                    <div key={key} className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                      <h4 className="font-medium text-purple-900 mb-2">{reqData.requirementLabel}</h4>
                       <div className="space-y-1">
                         {reqData.questions?.map((question: any) => {
                           const answer = reqData.answers?.[question.id];
@@ -2123,8 +2178,8 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                           
                           return (
                             <div key={question.id} className="text-sm">
-                              <span className="font-medium text-blue-800">{question.question_text}:</span>
-                              <span className="ml-2 text-blue-700">
+                              <span className="font-medium text-purple-800">{question.question_text}:</span>
+                              <span className="ml-2 text-purple-700">
                                 {Array.isArray(answer) ? answer.join(', ') : answer}
                               </span>
                             </div>
@@ -2414,7 +2469,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     if (loadingVendors) {
       return (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C4A661] mx-auto"></div>
+          <LoadingSpinner size="lg" />
           <p className="mt-2 text-gray-600">Loading vendor services...</p>
         </div>
       );
@@ -2423,11 +2478,13 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
     const vendorServices = apiVendorServices.length > 0 ? apiVendorServices : getVendorServicesForEvent();
     
     const toggleVendorService = (serviceId: string) => {
-      setSelectedVendorServices(prev => 
-        prev.includes(serviceId) 
-          ? prev.filter(id => id !== serviceId)
-          : [...prev, serviceId]
-      );
+      const newVendorServices = selectedVendorServices.includes(serviceId) 
+        ? selectedVendorServices.filter(id => id !== serviceId)
+        : [...selectedVendorServices, serviceId];
+      
+      setSelectedVendorServices(newVendorServices);
+      handleInputChange('selectedVendorServices', newVendorServices);
+      console.log('Vendor service toggled:', serviceId, 'New selection:', newVendorServices);
     };
     
     return (
@@ -2487,7 +2544,11 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => {
-                handleInputChange('selectedVendorServices', selectedVendorServices);
+                // Ensure vendor services are properly stored before continuing
+                const finalVendorServices = selectedVendorServices.length > 0 ? selectedVendorServices : formData.selectedVendorServices || [];
+                handleInputChange('selectedVendorServices', finalVendorServices);
+                setSelectedVendorServices(finalVendorServices);
+                console.log('Continue to review - storing vendor services:', finalVendorServices);
                 setCurrentStep('review');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -2497,9 +2558,40 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
             </button>
             <button
               onClick={async () => {
-                handleInputChange('selectedVendorServices', selectedVendorServices);
-                const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-                await handleSubmit(fakeEvent);
+                console.log('Skip vendors button clicked - selectedVendorServices:', selectedVendorServices);
+                console.log('Current formData before submit:', formData);
+                
+                try {
+                  // Ensure vendor services are stored in form data and state
+                  const updatedFormData = {
+                    ...formData,
+                    selectedVenueTypes: selectedVenueTypes.length > 0 ? selectedVenueTypes : formData.selectedVenueTypes || [], // Keep existing venue selections
+                    selectedVendorServices: selectedVendorServices.length > 0 ? selectedVendorServices : formData.selectedVendorServices || []
+                  };
+                  
+                  // Update both form data and input change to ensure persistence
+                  setFormData(updatedFormData);
+                  handleInputChange('selectedVenueTypes', updatedFormData.selectedVenueTypes);
+                  handleInputChange('selectedVendorServices', updatedFormData.selectedVendorServices);
+                  
+                  console.log('Updated form data with vendors:', updatedFormData);
+                  console.log('Final selectedVenueTypes:', updatedFormData.selectedVenueTypes);
+                  console.log('Final selectedVendorServices:', updatedFormData.selectedVendorServices);
+                  console.log('Authentication check:', {
+                    hasAccessToken: !!localStorage.getItem('access_token'),
+                    hasSessionToken: !!sessionStorage.getItem('access_token'),
+                    tokenPreview: localStorage.getItem('access_token')?.substring(0, 20)
+                  });
+                  
+                  // Wait a moment for state to update
+                  setTimeout(async () => {
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                    await handleSubmit(fakeEvent);
+                  }, 200);
+                } catch (error: unknown) {
+                  console.error('Skip vendors error:', error);
+                  alert(`Error creating event: ${error instanceof Error ? error.message : String(error)}`);
+                }
               }}
               disabled={isSubmitting}
               className="border-2 border-gray-300 hover:border-[#C4A661] text-gray-700 hover:text-[#C4A661] px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
@@ -2569,7 +2661,10 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
           Create Another Event
         </button>
         <button
-          onClick={() => onEventCreated(formData.eventName, formData.clientName)}
+          onClick={() => {
+            // Force navigation to dashboard, bypassing any routing issues
+            window.location.replace('/dashboard');
+          }}
           className="border-2 border-gray-300 hover:border-purple-600 text-gray-700 hover:text-purple-600 px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
         >
           Go to Dashboard
@@ -2647,60 +2742,44 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   };
 
   return (
-    <div className="relative conference-form-page">
-      {/* Animated Background - now handled by CSS class */}
-      
-      {/* Simplified decorative elements - reduced from 23 to 4 elements */}
-      <div className="fixed inset-0 pointer-events-none">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white/8 rounded-full"
-            style={{
-              width: `${8 + i * 2}px`,
-              height: `${8 + i * 2}px`,
-              left: `${25 + i * 20}%`,
-              top: `${20 + i * 15}%`,
-              opacity: 0.3
-            }}
-          />
-        ))}
-      </div>
+    <div className="relative min-h-screen bg-gray-50">
 
-      <div className="relative z-10 min-h-screen flex">
-        {/* LEFT SIDE - FIXED */}
-        <div className="fixed left-0 top-0 w-1/3 h-screen p-6 flex flex-col z-10">
+
+      <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
+        {/* LEFT SIDE - RESPONSIVE */}
+        <div className="lg:fixed lg:left-0 lg:top-0 lg:w-1/3 lg:h-screen p-4 lg:p-6 flex flex-col z-10 bg-white lg:bg-transparent">
           {/* Top - Logo */}
-          <div className="flex items-center gap-3 animate-fade-in mb-8">
+          <div className="flex items-center gap-3 mb-6 lg:mb-8">
             <img 
-              src="/images/partyoria symbol.png" 
+              src="/videos/partyoria.gif" 
               alt="PartyOria Logo" 
-              className="w-12 h-12 object-contain"
+              className="w-12 h-12 lg:w-16 lg:h-16 object-contain"
             />
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent drop-shadow-lg">
-              PartyOria
-            </span>
+            <h1 className="text-lg lg:text-xl font-bold text-gray-900 lg:hidden">
+              {subsection?.name} Planning
+            </h1>
           </div>
 
-          {/* Center - Hero Content */}
-          <div className="text-center animate-slide-in-left flex-1 flex flex-col justify-center">
+          {/* Center - Hero Content - Hidden on mobile */}
+          <div className="hidden lg:block text-center flex-1 flex flex-col justify-center">
             {/* Event Image */}
             <div className="w-full max-w-md mb-6 bg-white/10 backdrop-blur-xl rounded-3xl p-4 border border-white/20 shadow-2xl hover:transform hover:scale-105 transition-all duration-500 mx-auto">
               <div className="w-full h-64 rounded-2xl border-2 border-white/30 shadow-inner">
                 <img 
                   src={apiImages[subsectionId] || getEventImage(subsectionId)}
                   alt={subsection?.name || 'Event'}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-2xl"
+                  loading="lazy"
                 />
               </div>
             </div>
 
             {/* Heading with decorative elements */}
             <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 drop-shadow-lg leading-tight">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight">
                 Your {subsection?.name} Requirements
               </h2>
-              <p className="text-gray-800 leading-relaxed max-w-sm text-center drop-shadow-md text-base font-medium mx-auto">
+              <p className="text-gray-700 leading-relaxed max-w-sm text-center text-base font-medium mx-auto">
                 Let's start with these details to help us create your personalized proposal.
               </p>
             </div>
@@ -2708,28 +2787,39 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         </div>
 
         {/* RIGHT SIDE - SCROLLABLE */}
-        <div className="ml-[33.333333%] flex-1 p-6 min-h-screen overflow-y-auto">
+        <div className="w-full lg:ml-[33.333333%] flex-1 p-4 lg:p-6 min-h-screen overflow-y-auto">
           {/* Top Right - Close Button */}
           <button 
             onClick={onBack}
-            className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110 hover:rotate-90 z-20"
+            className="fixed top-4 right-4 lg:absolute lg:top-6 lg:right-6 w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-white bg-orange-500 hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110 touch-target z-20"
           >
-            <span className="text-2xl font-bold">×</span>
+            <span className="text-xl lg:text-2xl font-bold">×</span>
           </button>
 
           {/* Main Form Card */}
-          <div className="max-w-3xl mx-auto pt-8 pb-20 animate-slide-in-right">
-            <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 border border-white/30 shadow-2xl">
+          <div className="max-w-4xl mx-auto pt-4 lg:pt-8 pb-20">
+            <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-6 border border-gray-200 shadow-lg lg:shadow-2xl">
               {/* Progress Indicator */}
               <div className="mb-4">
-                <div className="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
-                  {getStepProgress()}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 lg:px-4 py-2 rounded-full text-xs lg:text-sm font-semibold shadow-lg">
+                    Step {getStepProgress()}
+                  </div>
+                  <span className="text-xs lg:text-sm text-gray-500">
+                    {Math.round(getProgressPercentage())}% Complete
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${getProgressPercentage()}%` }}
+                  />
                 </div>
               </div>
 
               {/* Step Label */}
               <div className="mb-4">
-                <span className="text-gray-600 text-sm font-medium">
+                <span className="text-gray-600 text-sm lg:text-base font-medium">
                   {currentStep === 'basic' && 'Basic details'}
                   {currentStep === 'location' && 'Select location'}
                   {currentStep === 'duration' && 'Duration & date'}
@@ -2737,7 +2827,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                   {currentStep === 'thankyou' && 'Planning choice'}
                   {currentStep === 'tradition' && 'Tradition style'}
                   {currentStep === 'food' && 'Food preferences'}
-                  {currentStep === 'requirements' && 'Venues'}
+                  {currentStep === 'requirements' && 'Special requirements'}
                   {currentStep === 'timeline' && 'Event timeline'}
                   {currentStep === 'venues' && 'Venue selection'}
                   {currentStep === 'vendors' && 'Vendor services'}
@@ -2746,7 +2836,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
               </div>
 
               {/* Main Heading */}
-              <h1 className="text-4xl font-bold mb-8 leading-tight bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 bg-clip-text text-transparent">
+              <h1 className="text-2xl lg:text-4xl font-bold mb-6 lg:mb-8 leading-tight text-black">
                 {currentStep === 'basic' && `Tell us about your ${subsection?.name.toLowerCase()}`}
                 {currentStep === 'location' && `Where do you want to host your ${subsection?.name.toLowerCase()}?`}
                 {currentStep === 'duration' && `When do you plan to have your ${subsection?.name.toLowerCase()}?`}
@@ -2754,7 +2844,7 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
                 {currentStep === 'thankyou' && 'Thank you for the details!'}
                 {currentStep === 'tradition' && 'Choose your tradition style'}
                 {currentStep === 'food' && 'What are your food preferences?'}
-                {currentStep === 'requirements' && 'Select your venues?'}
+                {currentStep === 'requirements' && 'What are your special requirements?'}
                 {currentStep === 'timeline' && 'Plan your event timeline'}
                 {currentStep === 'venues' && 'Select your preferred venues'}
                 {currentStep === 'vendors' && 'Choose your vendor services'}
@@ -2782,14 +2872,20 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
         eventType={subsection?.name}
         onSave={(savedData) => {
           if (selectedRequirement) {
-            // Save the complete requirement data including answers and mark as selected
+            // Save the complete requirement data including questions, answers and mark as selected
             setFormData(prev => ({
               ...prev,
               specialRequirements: {
                 ...prev.specialRequirements,
-                [selectedRequirement.id]: { ...savedData, selected: true }
+                [selectedRequirement.id]: {
+                  selected: true,
+                  requirementId: savedData.requirementId,
+                  requirementLabel: savedData.requirementLabel,
+                  questions: savedData.questions,
+                  answers: savedData.answers
+                }
               },
-              selectedServices: [...(prev.selectedServices || []), selectedRequirement.label]
+              selectedServices: [...(prev.selectedServices || []).filter(s => s !== selectedRequirement.label), selectedRequirement.label]
             }));
           }
         }}

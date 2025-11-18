@@ -1,9 +1,10 @@
 import React from 'react';
-import { Calendar, Edit, Trash2, Clock, Eye, Search, Filter, ChevronDown, Heart, Users, MapPin, ArrowLeft } from 'lucide-react';
+import { Calendar, Edit, Trash2, Clock, Eye, Search, Filter, ChevronDown, Heart, Users, MapPin, ArrowLeft, DollarSign } from 'lucide-react';
 import { eventStorage, StoredEvent } from '../utils/localStorage';
 import { apiService, ApiEvent } from '../services/api';
 import EventDetailsModal from './EventDetailsModal';
-import { getEventTheme } from '../utils/eventThemes';
+import { useNavigate } from 'react-router-dom';
+
 
 interface EventListProps {
   onEditEvent: (eventId: string, sectionId: string, subsectionId: string) => void;
@@ -11,6 +12,7 @@ interface EventListProps {
 }
 
 const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
+  const navigate = useNavigate();
   const [events, setEvents] = React.useState<StoredEvent[]>([]);
   const [apiEvents, setApiEvents] = React.useState<ApiEvent[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -170,66 +172,64 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
 
   if (allEvents.length === 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            {onBack && (
+      <div className="min-h-screen bg-white">
+        <nav className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex justify-between items-center">
               <button
-                onClick={onBack}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+                onClick={() => window.location.replace('/dashboard')}
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2"
               >
                 <ArrowLeft size={20} />
                 Back to Dashboard
               </button>
-            )}
+              <div className="text-center flex-1">
+                <h1 className="text-xl font-bold text-gray-900">My Events</h1>
+                <p className="text-sm text-gray-500">Manage your events</p>
+              </div>
+              <div className="w-40"></div>
+            </div>
+          </div>
+        </nav>
+
+        <div className="p-6">
+          <div className="text-center py-12">
+            <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No events</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by creating a new event.</p>
           </div>
         </div>
-        <div className="text-center py-12">
-          <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No events</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating a new event.</p>
-        </div>
+
       </div>
     );
   }
 
   return (
     <>
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 relative overflow-hidden conference-form-page">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 pointer-events-none">
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white/10 rounded-full animate-float"
-            style={{
-              width: `${20 + i * 10}px`,
-              height: `${20 + i * 10}px`,
-              left: `${10 + i * 12}%`,
-              top: `${15 + i * 10}%`,
-              animationDelay: `${i * 0.5}s`
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen bg-white">
 
-      <div className="relative z-10 p-6 space-y-8">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-white/30 text-gray-700 hover:text-purple-600 hover:bg-white/90 transition-all duration-300 shadow-lg"
-              >
-                <ArrowLeft size={20} />
-                Back to Dashboard
-              </button>
-            )}
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              My Events
-            </h1>
+      <nav className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={() => window.location.replace('/dashboard')}
+              className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2"
+            >
+              <ArrowLeft size={20} />
+              Back to Dashboard
+            </button>
+            <div className="text-center flex-1">
+              <h1 className="text-xl font-bold text-gray-900">My Events</h1>
+              <p className="text-sm text-gray-500">Manage your events</p>
+            </div>
+            <div className="w-40"></div>
           </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/30 p-4 shadow-lg">
+        </div>
+      </nav>
+
+      <div className="p-6 space-y-8">
+        <div className="flex justify-between items-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <div className="text-sm text-gray-600">{filteredAndSortedEvents.length} events</div>
             <div className="text-xs text-gray-500">
               Total Budget: ₹{filteredAndSortedEvents.reduce((sum, event) => sum + (event.budget || 0), 0).toLocaleString()}
@@ -240,7 +240,7 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
 
 
         {/* Search and Filters */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-xl border border-white/30 p-4 space-y-3 shadow-lg">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -306,24 +306,15 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                             event.eventName.toLowerCase().includes('cultural') ? 'cultural' :
                             'corporate';
             
-            // Skin color combinations
-            const skinColors = [
-              'from-amber-100 via-orange-50 to-yellow-50',
-              'from-rose-100 via-pink-50 to-orange-50', 
-              'from-orange-100 via-amber-50 to-yellow-50',
-              'from-yellow-100 via-orange-50 to-amber-50',
-              'from-pink-100 via-rose-50 to-orange-50',
-              'from-amber-50 via-yellow-50 to-orange-50'
-            ];
-            const skinColor = skinColors[index % skinColors.length];
+
             
             return (
               <div 
                 key={event.id}
-                className={`bg-gradient-to-br ${skinColor} backdrop-blur-sm rounded-xl border border-amber-200/40 hover:border-orange-300/60 shadow-sm hover:shadow-md transition-all duration-300 group transform hover:scale-105 relative overflow-hidden`}
+                className={`bg-white backdrop-blur-sm rounded-xl border border-gray-200/40 hover:border-purple-300/60 shadow-sm hover:shadow-md transition-all duration-300 group transform hover:scale-105 relative overflow-hidden`}
               >
                 {/* Event Image Placeholder */}
-                <div className="h-24 bg-gradient-to-br from-amber-200 via-orange-200 to-yellow-200 relative overflow-hidden rounded-t-xl">
+                <div className="h-24 bg-gray-100 relative overflow-hidden rounded-t-xl">
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-lg opacity-60">
                       {eventType === 'social' ? '💍' : 
@@ -368,15 +359,15 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                       {event.eventName}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-orange-600">
+                      <p className="text-sm font-bold text-purple-600">
                         ₹{(event.budget || 0) > 100000 ? `${((event.budget || 0) / 100000).toFixed(1)}L` : (event.budget || 0).toLocaleString()}
                       </p>
                       {(() => {
                         const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
-                        const subType = apiEvent?.form_data?.sub_type || 'event';
+                        const subType = apiEvent?.form_data?.sub_type || 'Conference';
                         return (
-                          <span className="px-2 py-1 text-sm bg-orange-100/80 text-orange-700 rounded-md font-medium">
-                            {subType.split('-')[0].charAt(0).toUpperCase() + subType.split('-')[0].slice(1)}
+                          <span className="px-2 py-1 text-sm bg-purple-100/80 text-purple-700 rounded-md font-medium">
+                            {subType}
                           </span>
                         );
                       })()}
@@ -394,11 +385,11 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                   {/* Event Details Grid */}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center gap-2 text-gray-600">
-                      <Users size={16} className="text-orange-500" />
+                      <Users size={16} className="text-purple-500" />
                       <span className="font-medium">{event.attendees || 0} Guests</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
-                      <span className="w-2 h-2 bg-orange-400 rounded-full"></span>
+                      <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
                       <span className="font-medium">{(() => {
                         const apiEvent = apiEvents.find(e => e.id?.toString() === event.id);
                         const selectedServices = apiEvent?.selected_services;
@@ -412,13 +403,13 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                   {/* Date */}
                   <div className="text-sm text-gray-600">
                     <p className="flex items-center gap-2">
-                      <Calendar size={16} className="text-amber-500" />
+                      <Calendar size={16} className="text-purple-500" />
                       <span className="font-medium">{event.dateTime ? new Date(event.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}</span>
                     </p>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-1 pt-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -427,10 +418,20 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                         const subType = apiEvent?.form_data?.sub_type || 'conference';
                         onEditEvent(event.id, eventType, subType);
                       }}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-amber-400 text-white rounded-md hover:from-orange-500 hover:to-amber-500 transition-all duration-300 shadow-sm hover:shadow-md"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
-                      <Edit size={14} />
+                      <Edit size={12} />
                       Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/budget-dashboard/${event.id}`);
+                      }}
+                      className="flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <DollarSign size={12} />
+                      Budget
                     </button>
                     <button
                       onClick={(e) => {
@@ -438,18 +439,18 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                         setSelectedEventId(event.id);
                         setShowDetailsModal(true);
                       }}
-                      className="flex items-center justify-center px-3 py-2 text-sm font-semibold bg-white/80 text-gray-700 rounded-md border border-amber-200 hover:bg-white/90 transition-all duration-300 shadow-sm hover:shadow-md"
+                      className="flex items-center justify-center px-2 py-2 text-xs font-semibold bg-white/80 text-gray-700 rounded-md border border-gray-200 hover:bg-white/90 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
-                      <Eye size={14} />
+                      <Eye size={12} />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDelete(event.id, (event as any).isApiEvent);
                       }}
-                      className="flex items-center justify-center px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50/80 rounded-md border border-red-200/60 hover:border-red-300 transition-all duration-300 shadow-sm hover:shadow-md"
+                      className="flex items-center justify-center px-2 py-2 text-xs font-semibold text-red-600 hover:bg-red-50/80 rounded-md border border-red-200/60 hover:border-red-300 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
@@ -459,18 +460,7 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
         </div>
       </div>
       
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
-          25% { transform: translateY(-20px) rotate(90deg); opacity: 1; }
-          50% { transform: translateY(-10px) rotate(180deg); opacity: 0.8; }
-          75% { transform: translateY(-15px) rotate(270deg); opacity: 0.9; }
-        }
-        
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-      `}</style>
+
       
     </div>
     

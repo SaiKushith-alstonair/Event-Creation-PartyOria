@@ -30,7 +30,7 @@ const EventTypes: React.FC<EventTypesProps> = ({
   };
 
   const colors = {
-    'corporate': { bg: 'from-blue-500 to-blue-600', text: 'text-blue-600' },
+    'corporate': { bg: 'from-purple-500 to-pink-600', text: 'text-purple-600' },
     'social': { bg: 'from-purple-500 to-purple-600', text: 'text-purple-600' },
     'cultural': { bg: 'from-indigo-500 to-indigo-600', text: 'text-indigo-600' },
     'religious': { bg: 'from-slate-500 to-slate-600', text: 'text-slate-600' },
@@ -45,17 +45,17 @@ const EventTypes: React.FC<EventTypesProps> = ({
     'community': { bg: 'from-orange-500 to-orange-600', text: 'text-orange-600' }
   };
 
-  const colorScheme = colors[selectedSectionData.id as keyof typeof colors] || { bg: 'from-blue-500 to-blue-600', text: 'text-blue-600' };
+  const colorScheme = colors[selectedSectionData.id as keyof typeof colors] || { bg: 'from-purple-500 to-pink-600', text: 'text-purple-600' };
 
   return (
-    <div className="main-container corporate-events-grid">
+    <div className="main-container corporate-events-grid bg-white" style={{minHeight: '100vh'}}>
       {/* Navigation Header */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 relative z-50">
+      <nav className="bg-white backdrop-blur-md border-b border-gray-200 shadow-sm relative z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center space-x-4">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all duration-300"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all duration-300 flex items-center gap-2"
             >
               <ArrowLeft size={18} />
               Back
@@ -132,3 +132,4 @@ const EventTypes: React.FC<EventTypesProps> = ({
 };
 
 export default EventTypes;
+

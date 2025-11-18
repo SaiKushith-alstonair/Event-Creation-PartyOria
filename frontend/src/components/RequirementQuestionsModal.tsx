@@ -90,47 +90,76 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
   }, [galleryImages]);
 
   const getFallbackQuestions = (requirementId: string): Question[] => {
-    return [
-      { id: 1, question_text: 'Quantity needed?', question_type: 'number', min_value: 1, max_value: 100, is_required: true, order: 1 },
-      { id: 2, question_text: 'Special requirements?', question_type: 'text', placeholder: 'Any specific needs', is_required: false, order: 2 }
+    console.log('🔄 Getting fallback questions for requirement ID:', requirementId);
+    
+    // Wedding Cake specific questions
+    if (requirementId.includes('wedding-cake') || requirementId.includes('cake')) {
+      return [
+        { id: 1, question_text: 'How many tiers do you want for your wedding cake?', question_type: 'dropdown', options: ['1 Tier', '2 Tiers', '3 Tiers', '4 Tiers', '5+ Tiers'], is_required: true, order: 1 },
+        { id: 2, question_text: 'What cake flavor would you prefer?', question_type: 'dropdown', options: ['Vanilla', 'Chocolate', 'Red Velvet', 'Strawberry', 'Butterscotch', 'Black Forest', 'Fruit Cake', 'Custom Flavor'], is_required: true, order: 2 },
+        { id: 3, question_text: 'What type of cake design do you want?', question_type: 'dropdown', options: ['Simple & Elegant', 'Floral Decorations', 'Fondant Design', 'Buttercream Roses', 'Theme-based Design', 'Photo Cake', 'Naked Cake Style'], is_required: true, order: 3 },
+        { id: 4, question_text: 'What is your preferred cake size?', question_type: 'dropdown', options: ['1-2 kg (serves 10-15)', '2-3 kg (serves 20-25)', '3-5 kg (serves 30-40)', '5-8 kg (serves 50-60)', '8+ kg (serves 70+)'], is_required: true, order: 4 },
+        { id: 5, question_text: 'Any special dietary requirements for the cake?', question_type: 'checkbox', options: ['Eggless', 'Sugar-free', 'Gluten-free', 'Vegan', 'Nut-free', 'No special requirements'], is_required: false, order: 5 }
+      ];
+    }
+    
+    // Environmental/Tree Planting specific questions
+    if (requirementId.includes('tree') || requirementId.includes('plant') || requirementId.includes('landscap')) {
+      return [
+        { id: 1, question_text: 'How many trees do you want to plant?', question_type: 'number', min_value: 1, max_value: 1000, is_required: true, order: 1, placeholder: 'Number of saplings' },
+        { id: 2, question_text: 'What type of trees would you prefer?', question_type: 'dropdown', options: ['Native Species', 'Fruit Trees', 'Flowering Trees', 'Fast Growing Trees', 'Mixed Variety'], is_required: false, order: 2 },
+        { id: 3, question_text: 'Do you have a preferred planting location?', question_type: 'text', placeholder: 'Describe the area or let us suggest suitable locations', is_required: false, order: 3 }
+      ];
+    }
+    
+    // Tools/Equipment for environmental events
+    if (requirementId.includes('tools') || requirementId.includes('equipment')) {
+      return [
+        { id: 1, question_text: 'What type of tools do you need?', question_type: 'checkbox', options: ['Shovels & Spades', 'Watering Equipment', 'Mulch & Compost', 'Protective Gear', 'Measuring Tools'], is_required: true, order: 1 },
+        { id: 2, question_text: 'How many volunteers will participate?', question_type: 'number', min_value: 1, max_value: 500, is_required: true, order: 2, placeholder: 'Number of participants' }
+      ];
+    }
+    
+    // Default fallback for other requirements - make them more generic and relevant
+    const fallbackQuestions = [
+      { id: 1, question_text: `How many ${requirement.label.toLowerCase()} do you need?`, question_type: 'number', min_value: 1, max_value: 100, is_required: true, order: 1, placeholder: 'Enter quantity' },
+      { id: 2, question_text: `What are your specific preferences for ${requirement.label.toLowerCase()}?`, question_type: 'text', placeholder: `Describe your requirements for ${requirement.label.toLowerCase()}`, is_required: false, order: 2 },
+      { id: 3, question_text: `How important is ${requirement.label.toLowerCase()} for your event?`, question_type: 'dropdown', options: ['Very Important', 'Important', 'Somewhat Important', 'Nice to Have'], is_required: false, order: 3 }
     ];
+    
+    console.log('📝 Generated fallback questions:', fallbackQuestions);
+    return fallbackQuestions;
   };
 
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      // Try multiple approaches to find questions
-      const searchIds = [requirement.id, eventId, eventType?.toLowerCase().replace(/\s+/g, '-')];
+      const url = `http://localhost:8000/api/events/requirement-questions/?requirement_id=${requirement.id}`;
+      console.log('Fetching questions from:', url);
       
-      let questionsToUse: Question[] = [];
+      const response = await fetch(url);
+      const data = await response.json();
       
-      for (const searchId of searchIds) {
-        if (!searchId) continue;
-        
-        const params = new URLSearchParams({ requirement_id: searchId });
-        if (eventId) params.append('event_id', eventId);
-        
-        const response = await fetch(`http://localhost:8000/api/events/requirement-questions/?${params}`);
-        const data = await response.json();
-        
-        if (data.questions && data.questions.length > 0) {
-          questionsToUse = data.questions;
-          console.log(`Found ${questionsToUse.length} questions for ${searchId}`);
-          break;
-        }
+      console.log('API response:', data);
+      
+      if (data.questions && data.questions.length > 0) {
+        setQuestions(data.questions);
+        const initialAnswers: Record<string, any> = {};
+        data.questions.forEach((q: Question) => {
+          initialAnswers[q.id] = q.question_type === 'checkbox' ? [] : '';
+        });
+        setAnswers(initialAnswers);
+        console.log(`✅ Loaded ${data.questions.length} questions from database`);
+      } else {
+        console.warn('No questions found in database, using fallback');
+        const fallbackQuestions = getFallbackQuestions(requirement.id);
+        setQuestions(fallbackQuestions);
+        const initialAnswers: Record<string, any> = {};
+        fallbackQuestions.forEach((q: Question) => {
+          initialAnswers[q.id] = q.question_type === 'checkbox' ? [] : '';
+        });
+        setAnswers(initialAnswers);
       }
-      
-      if (questionsToUse.length === 0) {
-        console.warn(`No questions found for ${requirement.id}, using fallback`);
-        questionsToUse = getFallbackQuestions(requirement.id);
-      }
-      
-      setQuestions(questionsToUse);
-      const initialAnswers: Record<string, any> = {};
-      questionsToUse.forEach((q: Question) => {
-        initialAnswers[q.id] = q.question_type === 'checkbox' ? [] : '';
-      });
-      setAnswers(initialAnswers);
     } catch (error) {
       console.error('Error fetching questions:', error);
       const fallbackQuestions = getFallbackQuestions(requirement.id);
@@ -187,26 +216,38 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
     switch (question.question_type) {
       case 'text':
         return (
-          <input
-            type="text"
+          <textarea
             value={answers[question.id] || ''}
             onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            placeholder={question.placeholder || 'Please provide details...'}
+            rows={3}
+            className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-300 bg-white shadow-sm transition-all duration-200 hover:border-purple-200 resize-none"
           />
         );
 
       case 'number':
         return (
-          <input
-            type="number"
-            value={answers[question.id] || ''}
-            onChange={(e) => handleAnswerChange(question.id, parseInt(e.target.value) || '')}
-            min={question.min_value}
-            max={question.max_value}
-            placeholder={question.placeholder}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
+          <div className="relative">
+            <input
+              type="number"
+              value={answers[question.id] || ''}
+              onChange={(e) => handleAnswerChange(question.id, parseInt(e.target.value) || '')}
+              min={question.min_value}
+              max={question.max_value}
+              placeholder={question.placeholder || 'Enter quantity'}
+              className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-300 bg-white shadow-sm transition-all duration-200 hover:border-purple-200"
+            />
+            {(question.min_value || question.max_value) && (
+              <p className="text-xs text-gray-500 mt-1">
+                {question.min_value && question.max_value 
+                  ? `Range: ${question.min_value} - ${question.max_value}`
+                  : question.min_value 
+                  ? `Minimum: ${question.min_value}`
+                  : `Maximum: ${question.max_value}`
+                }
+              </p>
+            )}
+          </div>
         );
 
       case 'dropdown':
@@ -214,11 +255,11 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
           <select
             value={answers[question.id] || ''}
             onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-300 bg-white shadow-sm transition-all duration-200 hover:border-purple-200"
           >
             <option value="">Select an option</option>
             {question.options?.map((option, index) => (
-              <option key={index} value={option}>
+              <option key={index} value={option} className="py-2">
                 {option}
               </option>
             ))}
@@ -227,18 +268,18 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
 
       case 'radio':
         return (
-          <div className="space-y-2">
+          <div className="grid gap-3">
             {question.options?.map((option, index) => (
-              <label key={index} className="flex items-center space-x-2">
+              <label key={index} className="flex items-center p-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border-2 border-transparent hover:border-purple-200">
                 <input
                   type="radio"
                   name={`question_${question.id}`}
                   value={option}
                   checked={answers[question.id] === option}
                   onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                  className="text-purple-600 focus:ring-purple-500"
+                  className="text-purple-600 focus:ring-purple-500 mr-3"
                 />
-                <span>{option}</span>
+                <span className="font-medium text-gray-700">{option}</span>
               </label>
             ))}
           </div>
@@ -246,16 +287,16 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
 
       case 'checkbox':
         return (
-          <div className="space-y-2">
+          <div className="grid gap-3">
             {question.options?.map((option, index) => (
-              <label key={index} className="flex items-center space-x-2">
+              <label key={index} className="flex items-center p-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border-2 border-transparent hover:border-purple-200">
                 <input
                   type="checkbox"
                   checked={(answers[question.id] || []).includes(option)}
                   onChange={(e) => handleCheckboxChange(question.id, option, e.target.checked)}
-                  className="text-purple-600 focus:ring-purple-500"
+                  className="text-purple-600 focus:ring-purple-500 mr-3"
                 />
-                <span>{option}</span>
+                <span className="font-medium text-gray-700">{option}</span>
               </label>
             ))}
           </div>
@@ -361,25 +402,60 @@ const RequirementQuestionsModal: React.FC<RequirementQuestionsModalProps> = ({
               )}
 
               {currentView === 'questions' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {questions.length > 0 ? (
                     <>
-                      <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        <span>❓</span> Additional Details
-                      </h3>
-                      {questions.map((question) => (
-                        <div key={question.id} className="space-y-2 bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/30 shadow-sm">
-                          <label className="block text-sm font-medium text-gray-700">
-                            {question.question_text}
-                            {question.is_required && <span className="text-red-500 ml-1">*</span>}
-                          </label>
-                          {renderQuestion(question)}
+                      <div className="text-center mb-8">
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-3">
+                          <span>📋</span> {requirement.label} - Detailed Requirements
+                        </h3>
+                        <p className="text-gray-600">Please provide specific details to help us serve you better</p>
+                      </div>
+                      
+                      <div className="grid gap-6">
+                        {questions.map((question, index) => (
+                          <div key={question.id} className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-white/40 shadow-lg hover:shadow-xl transition-all duration-300">
+                            <div className="flex items-start gap-4">
+                              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <label className="block text-lg font-semibold text-gray-800">
+                                  {question.question_text}
+                                  {question.is_required && (
+                                    <span className="ml-2 text-red-500 text-sm font-normal">(Required)</span>
+                                  )}
+                                </label>
+                                <div className="mt-3">
+                                  {renderQuestion(question)}
+                                </div>
+                                {question.placeholder && question.question_type === 'text' && (
+                                  <p className="text-sm text-gray-500 italic mt-1">
+                                    💡 Tip: {question.placeholder}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-2xl">💡</span>
+                          <h4 className="text-lg font-semibold text-gray-800">Why do we ask these questions?</h4>
                         </div>
-                      ))}
+                        <p className="text-gray-700 leading-relaxed">
+                          These specific details help us provide accurate quotes, recommend the right vendors, 
+                          and ensure your event requirements are perfectly matched with available services.
+                        </p>
+                      </div>
                     </>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No additional questions available for this requirement.
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">📝</div>
+                      <h3 className="text-xl font-semibold text-gray-800 mb-2">No Additional Questions</h3>
+                      <p className="text-gray-600">This requirement doesn't need additional details at this time.</p>
                     </div>
                   )}
                 </div>
