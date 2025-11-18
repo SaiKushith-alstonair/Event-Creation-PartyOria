@@ -237,7 +237,7 @@ const DashboardLayout: React.FC = () => {
         return (
           <div className="p-6">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">My Quotes</h1>
-            <QuotesDashboard eventId={1} eventName="My Event" />
+            <QuotesDashboard eventId={12} eventName="Wedding" />
           </div>
         );
       case 'quote-management':

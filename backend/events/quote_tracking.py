@@ -4,23 +4,43 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import Event, QuoteRequest
+from .models import Event, QuoteRequest, VendorQuote
 from vendors.models import VendorAuth
 from notifications.services import VendorNotifications, CustomerNotifications
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def customer_quote_status(request, event_id):
     """Get quote status for customer - shows all quotes sent for their event"""
     try:
-        # Get event for authenticated user
-        event = get_object_or_404(Event, id=event_id, user=request.user)
+        # Get event - handle both authenticated and unauthenticated users
+        if request.user.is_authenticated:
+            event = get_object_or_404(Event, id=event_id, user=request.user)
+            user_filter = request.user
+        else:
+            # For development, get event regardless of user
+            event = get_object_or_404(Event, id=event_id)
+            # Use the event's user if it exists, otherwise use user ID 2 (saiku)
+            if event.user:
+                user_filter = event.user
+            else:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    user_filter = User.objects.get(id=2)
+                except User.DoesNotExist:
+                    user_filter = None
         
         # Get all quote requests for this event
-        quote_requests = QuoteRequest.objects.filter(
-            prefilled_event_id=event_id,
-            user=request.user
-        ).order_by('-created_at')
+        if user_filter:
+            quote_requests = QuoteRequest.objects.filter(
+                prefilled_event_id=event_id,
+                user=user_filter
+            ).order_by('-created_at')
+        else:
+            quote_requests = QuoteRequest.objects.filter(
+                prefilled_event_id=event_id
+            ).order_by('-created_at')
         
         quotes_data = []
         for qr in quote_requests:
@@ -45,7 +65,8 @@ def customer_quote_status(request, event_id):
             'event_name': event.event_name,
             'quotes': quotes_data,
             'total_quotes_sent': len(quotes_data),
-            'total_responses': sum(q['responses_received'] for q in quotes_data)
+            'total_responses': sum(q['responses_received'] for q in quotes_data),
+            'message': 'Quotes sent to real vendors. Responses will appear when vendors submit their quotes.' if len(quotes_data) > 0 else 'No quotes sent yet.'
         })
         
     except Exception as e:
@@ -171,18 +192,37 @@ def vendor_submit_quote_response(request, quote_id):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def quote_responses_for_event(request, event_id):
     """Get all quote responses for a specific event (customer view)"""
     try:
-        # Get event for authenticated user
-        event = get_object_or_404(Event, id=event_id, user=request.user)
+        # Get event - handle both authenticated and unauthenticated users
+        if request.user.is_authenticated:
+            event = get_object_or_404(Event, id=event_id, user=request.user)
+            user_filter = request.user
+        else:
+            # For development, get event regardless of user
+            event = get_object_or_404(Event, id=event_id)
+            # Use the event's user if it exists, otherwise use user ID 2 (saiku)
+            if event.user:
+                user_filter = event.user
+            else:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    user_filter = User.objects.get(id=2)
+                except User.DoesNotExist:
+                    user_filter = None
         
-        quote_requests = QuoteRequest.objects.filter(
-            prefilled_event_id=event_id,
-            user=request.user,
-            vendor_responses__isnull=False
-        )
+        if user_filter:
+            quote_requests = QuoteRequest.objects.filter(
+                prefilled_event_id=event_id,
+                user=user_filter
+            )
+        else:
+            quote_requests = QuoteRequest.objects.filter(
+                prefilled_event_id=event_id
+            )
         
         all_responses = []
         for qr in quote_requests:

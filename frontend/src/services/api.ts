@@ -476,6 +476,12 @@ class ApiService {
     });
   }
 
+  async sendQuotes(eventId: number): Promise<any> {
+    return this.request<any>(`/events/${eventId}/send-quotes/`, {
+      method: 'POST',
+    });
+  }
+
   async createQuoteRequest(quoteData: any): Promise<any> {
     return this.request<any>('/quote-requests/', {
       method: 'POST',

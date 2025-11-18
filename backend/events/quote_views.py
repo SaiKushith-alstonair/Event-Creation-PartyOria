@@ -4,67 +4,125 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta
+from django.db import models
+from datetime import timedelta, datetime
 from decimal import Decimal
-from .models import Event, QuoteRequest
+from .models import Event, QuoteRequest, VendorQuote
 from vendors.models import VendorAuth
 from notifications.services import VendorNotifications, CustomerNotifications
 
+def parse_event_date(date_string):
+    """Parse event date from various formats"""
+    if not date_string:
+        return timezone.now().date()
+    
+    try:
+        # Try parsing different date formats
+        if 'T' in date_string:
+            # ISO format with time
+            return datetime.fromisoformat(date_string.replace('Z', '+00:00')).date()
+        elif '-' in date_string and len(date_string) == 10:
+            # YYYY-MM-DD format
+            return datetime.strptime(date_string, '%Y-%m-%d').date()
+        else:
+            # Fallback to current date
+            return timezone.now().date()
+    except:
+        return timezone.now().date()
+
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def send_quote_requests(request, event_id):
     """Send quote requests to matched vendors after budget completion"""
     try:
-        event = get_object_or_404(Event, id=event_id, user=request.user)
+        # Get event regardless of user for development
+        event = get_object_or_404(Event, id=event_id)
         
         # Get matched vendors based on event requirements
-        matched_vendors = match_vendors_to_event(event)
+        matched_vendors, categories = match_vendors_to_event(event)
         
         if not matched_vendors:
             return Response({
                 'success': False,
-                'error': 'No matching vendors found for this event'
-            }, status=status.HTTP_400_BAD_REQUEST)
+                'message': 'No matching vendors found for this event. Please check if vendors are available in your area or try expanding your service requirements.',
+                'vendors_searched': 0,
+                'categories_searched': list(categories) if categories else []
+            }, status=status.HTTP_200_OK)
         
-        # Create quote request using existing model
+        # Get user for quote request
+        if request.user.is_authenticated:
+            quote_user = request.user
+        else:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                quote_user = User.objects.get(id=2)  # saiku user
+            except User.DoesNotExist:
+                quote_user = None
+        
+        # Get services for quote
+        services = event.services or []
+        if event.selected_services:
+            services.extend(event.selected_services)
+        if event.form_data and event.form_data.get('selectedServices'):
+            services.extend(event.form_data['selectedServices'])
+        services = list(set(services))  # Remove duplicates
+        
+        # Create quote request
         quote_request = QuoteRequest.objects.create(
             event_type=event.event_type,
             event_name=event.event_name,
-            client_name=event.form_data.get('clientName', 'Customer'),
-            client_email=event.form_data.get('clientEmail', ''),
-            client_phone=event.form_data.get('clientPhone', ''),
-            event_date=event.form_data.get('dateTime', timezone.now().date()),
-            location=f"{event.form_data.get('city', '')}, {event.form_data.get('state', '')}",
+            client_name=event.form_data.get('clientName', 'Customer') if event.form_data else 'Customer',
+            client_email=event.form_data.get('clientEmail', '') if event.form_data else '',
+            client_phone=event.form_data.get('clientPhone', '') if event.form_data else '',
+            event_date=parse_event_date(event.form_data.get('dateTime') if event.form_data else None),
+            location=f"{event.form_data.get('city', '')}, {event.form_data.get('state', '')}" if event.form_data else '',
             guest_count=event.attendees or 0,
             budget_range=f"₹{event.total_budget}",
-            services=list(event.special_requirements.keys()) if event.special_requirements else [],
-            description=event.form_data.get('description', ''),
+            services=services,
+            description=event.form_data.get('description', '') if event.form_data else '',
             urgency='medium',
-            user=request.user,
+            user=quote_user,
             prefilled_event_id=event.id,
             selected_vendors=[v.full_name for v in matched_vendors],
             is_targeted_quote=True,
             quote_type='targeted'
         )
         
-        # Send notifications to vendors
+        # Send notifications to real vendors
         notifications_sent = 0
+        
         for vendor in matched_vendors:
-            if vendor.chat_user:
-                VendorNotifications.new_quote_request(
-                    vendor.chat_user,
-                    event.form_data.get('clientName', 'Customer'),
-                    event.event_type,
-                    event.form_data.get('dateTime', 'TBD'),
-                    quote_request.id
-                )
-                notifications_sent += 1
+            if hasattr(vendor, 'chat_user') and vendor.chat_user:
+                try:
+                    VendorNotifications.new_quote_request(
+                        vendor.chat_user,
+                        event.form_data.get('clientName', 'Customer') if event.form_data else 'Customer',
+                        event.event_type,
+                        event.form_data.get('dateTime', 'TBD') if event.form_data else 'TBD',
+                        quote_request.id
+                    )
+                    notifications_sent += 1
+                except Exception as e:
+                    print(f"Failed to send notification to {vendor.full_name}: {e}")
+        
+        # Set status to vendors_notified (real vendors will respond later)
+        quote_request.status = 'vendors_notified'
+        quote_request.save()
         
         return Response({
             'success': True,
+            'message': f'Quote requests sent to {len(matched_vendors)} vendors successfully',
             'quote_request_id': quote_request.id,
             'vendor_count': len(matched_vendors),
-            'notifications_sent': notifications_sent
+            'vendors_contacted': [{
+                'name': v.full_name,
+                'business': v.business,
+                'category': map_service_to_category(v.business),
+                'location': v.location
+            } for v in matched_vendors],
+            'notifications_sent': notifications_sent,
+            'categories_matched': list(categories)
         })
         
     except Exception as e:
@@ -312,62 +370,141 @@ def accept_quote(request, quote_id):
 
 # Helper functions
 def match_vendors_to_event(event):
-    """Simple vendor matching logic"""
+    """Match real vendors based on event services and location"""
     matched_vendors = []
     
-    if not event.special_requirements:
-        return matched_vendors
+    # Get services from multiple sources
+    services = event.services or []
+    selected_services = event.selected_services or []
+    form_services = event.form_data.get('selectedServices', []) if event.form_data else []
     
-    # Get all categories from selected requirements
+    # Also check special requirements for additional services
+    special_req_services = []
+    if event.special_requirements:
+        for req_id, req_data in event.special_requirements.items():
+            if req_data.get('selected'):
+                category = map_service_to_category(req_id)
+                special_req_services.append(category)
+    
+    # Combine all service sources
+    all_services = list(set(services + selected_services + form_services + special_req_services))
+    
+    if not all_services:
+        event_type_services = get_default_services_for_event_type(event.event_type)
+        all_services = event_type_services
+    
+    # Map services to vendor categories
     categories = set()
-    for req_id, req_data in event.special_requirements.items():
-        if req_data.get('selected'):
-            category = map_requirement_to_category(req_id)
-            categories.add(category)
+    for service in all_services:
+        category = map_service_to_category(service)
+        categories.add(category)
     
-    # Find vendors matching any of the categories
-    for category in categories:
-        vendors = VendorAuth.objects.filter(
-            city=event.form_data.get('city', ''),
-            is_active=True,
-            is_verified=True,
-            services__contains=[category]
-        )[:2]  # Limit to 2 vendors per category
+    # Get location from event
+    location = event.form_data.get('city', '') if event.form_data else ''
+    
+    try:
+        # Get all active vendors first
+        vendors_query = VendorAuth.objects.filter(is_active=True)
         
-        matched_vendors.extend(vendors)
-    
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_vendors = []
-    for vendor in matched_vendors:
-        if vendor.id not in seen:
-            seen.add(vendor.id)
-            unique_vendors.append(vendor)
-    
-    return unique_vendors[:5]  # Max 5 vendors total
+        # Filter by location if available
+        if location:
+            location_vendors = vendors_query.filter(
+                models.Q(city__icontains=location) | 
+                models.Q(location__icontains=location)
+            )
+            if location_vendors.exists():
+                vendors_query = location_vendors
+        
+        # Match vendors by business type or services
+        for category in categories:
+            category_vendors = vendors_query.filter(
+                models.Q(business__icontains=category) |
+                models.Q(services__icontains=category) |
+                models.Q(full_name__icontains=category)
+            )
+            matched_vendors.extend(category_vendors)
+        
+        # If no category matches, get all available vendors
+        if not matched_vendors:
+            matched_vendors = list(vendors_query.all())
+        
+        # Remove duplicates
+        seen = set()
+        unique_vendors = []
+        for vendor in matched_vendors:
+            if vendor.id not in seen:
+                seen.add(vendor.id)
+                unique_vendors.append(vendor)
+        
+        return unique_vendors, categories
+            
+    except Exception as e:
+        print(f"Error finding vendors: {e}")
+        return [], categories
 
-def map_requirement_to_category(req_id):
-    """Map requirement ID to vendor service category"""
-    req_lower = req_id.lower()
+def get_default_services_for_event_type(event_type):
+    """Get default services based on event type"""
+    defaults = {
+        'wedding': ['photography', 'videography', 'catering', 'decoration', 'flowers', 'venue'],
+        'birthday': ['catering', 'decoration', 'entertainment', 'photography'],
+        'corporate': ['catering', 'venue', 'entertainment', 'photography'],
+        'festival': ['entertainment', 'decoration', 'security', 'catering'],
+        'other': ['catering', 'photography', 'venue']
+    }
+    return defaults.get(event_type, ['catering', 'photography', 'venue'])
+
+def map_service_to_category(service):
+    """Map service name to vendor category"""
+    service_lower = service.lower()
     
-    if any(word in req_lower for word in ['catering', 'food', 'menu']):
+    # Catering Services
+    if any(word in service_lower for word in ['catering', 'food', 'menu', 'chef', 'kitchen', 'meal', 'buffet', 'dining']):
         return 'catering'
-    elif any(word in req_lower for word in ['photo', 'camera']):
+    
+    # Photography Services
+    elif any(word in service_lower for word in ['photography', 'photo', 'camera', 'photographer', 'portrait', 'candid']):
         return 'photography'
-    elif any(word in req_lower for word in ['video', 'film']):
+    
+    # Videography Services
+    elif any(word in service_lower for word in ['videography', 'video', 'film', 'cinematography', 'recording']):
         return 'videography'
-    elif any(word in req_lower for word in ['music', 'dj', 'band']):
-        return 'music'
-    elif any(word in req_lower for word in ['decor', 'decoration']):
+    
+    # Entertainment Services
+    elif any(word in service_lower for word in ['entertainment', 'music', 'dj', 'band', 'singer', 'performer', 'artist']):
+        return 'entertainment'
+    
+    # Decoration Services
+    elif any(word in service_lower for word in ['decoration', 'decor', 'setup', 'design', 'styling', 'theme']):
         return 'decoration'
-    elif any(word in req_lower for word in ['flower', 'floral']):
+    
+    # Venue Services
+    elif any(word in service_lower for word in ['venue', 'hall', 'location', 'banquet', 'resort', 'hotel']):
+        return 'venue'
+    
+    # Floral Services
+    elif any(word in service_lower for word in ['flower', 'floral', 'bouquet', 'garland', 'arrangement']):
         return 'flowers'
-    elif any(word in req_lower for word in ['transport', 'vehicle']):
+    
+    # Transportation Services
+    elif any(word in service_lower for word in ['transport', 'vehicle', 'car', 'bus', 'travel']):
         return 'transportation'
-    elif any(word in req_lower for word in ['security', 'guard']):
+    
+    # Makeup & Beauty Services
+    elif any(word in service_lower for word in ['makeup', 'beauty', 'hair', 'styling', 'mehendi', 'spa']):
+        return 'beauty'
+    
+    # Security Services
+    elif any(word in service_lower for word in ['security', 'guard', 'safety', 'protection']):
         return 'security'
+    
+    # Event Planning Services
+    elif any(word in service_lower for word in ['planning', 'coordinator', 'management', 'organizer']):
+        return 'planning'
+    
     else:
         return 'general'
+
+
 
 def get_requirement_budget(event, requirement_id):
     """Get budget allocation for specific requirement"""

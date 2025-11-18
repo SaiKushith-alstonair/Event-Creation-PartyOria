@@ -42,8 +42,8 @@ urlpatterns = [
     path('quotes/<int:quote_id>/accept/', accept_quote, name='accept-quote'),
     
     # Vendor Quote endpoints
-    path('vendor/pending-quotes/', vendor_pending_quotes, name='vendor-pending-quotes'),
-    path('vendor/quotes/<int:quote_id>/submit/', vendor_submit_quote_response, name='vendor-submit-quote'),
+    path('events/vendor/pending-quotes/', vendor_pending_quotes, name='vendor-pending-quotes'),
+    path('events/vendor/quotes/<int:quote_id>/submit/', vendor_submit_quote_response, name='vendor-submit-quote'),
     
     # Separate routers
     path('quote-requests/', include(quote_router.urls)),
