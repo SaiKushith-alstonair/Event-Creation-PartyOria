@@ -37,12 +37,10 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
     def get_queryset(self):
         """Return events based on authentication status"""
         try:
-            # If user is authenticated, return their events
             if self.request.user.is_authenticated:
                 logger.info(f"Authenticated user {self.request.user.id} requesting events")
                 return Event.objects.filter(user=self.request.user).order_by('-created_at')
             else:
-                # For unauthenticated requests, return events for user ID 2 (saiku) for development
                 logger.info("Unauthenticated request, returning events for user ID 2")
                 return Event.objects.filter(user_id=2).order_by('-created_at')
         except Exception as e:
@@ -52,57 +50,26 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
     def list(self, request, *args, **kwargs):
         """List events for authenticated user with error handling"""
         try:
-            # Debug authentication
-            print(f"=== EVENTS LIST DEBUG ===")
-            print(f"User authenticated: {request.user.is_authenticated}")
-            print(f"User: {request.user}")
-            print(f"User ID: {getattr(request.user, 'id', None)}")
-            print(f"Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'None')}")
-            print(f"Request method: {request.method}")
-            print(f"Request path: {request.path}")
-            
             queryset = self.get_queryset()
-            print(f"Queryset count: {queryset.count()}")
-            
             serializer = self.get_serializer(queryset, many=True)
-            response_data = serializer.data
-            print(f"Returning {len(response_data)} events")
-            
-            return Response(response_data)
+            return Response(serializer.data)
         except Exception as e:
-            print(f"Error in list method: {str(e)}")
-            import traceback
-            traceback.print_exc()
             error_response = ErrorHandler.handle_generic_error(e, 'list_events')
             return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def destroy(self, request, *args, **kwargs):
         """Override destroy to handle event deletion with proper error handling"""
         try:
-            with transaction.atomic():
-                instance = self.get_object()
-                event_id = instance.id
-                event_name = instance.event_name
-                
-                # Validate user permissions
-                if instance.user and instance.user != request.user:
-                    error_response = ErrorHandler.handle_permission_error(
-                        "Cannot delete another user's event", 'delete_event'
-                    )
-                    return Response(error_response, status=status.HTTP_403_FORBIDDEN)
-                
-                # Delete the event
-                instance.delete()
-                
-                logger.info(f"Successfully deleted event {event_id}: {event_name}")
-                return Response(status=status.HTTP_204_NO_CONTENT)
-                
+            instance = self.get_object()
+            instance.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except ObjectDoesNotExist:
-            error_response = ErrorHandler.handle_not_found_error('Event', 'delete_event')
-            return Response(error_response, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Event not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            error_response = ErrorHandler.handle_generic_error(e, 'delete_event')
-            return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error deleting event: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def update(self, request, *args, **kwargs):
         """Override update with proper validation and error handling"""
@@ -197,16 +164,6 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
         """Automatically assign the authenticated user to the event"""
         form_data = self.request.data.get('form_data', {})
         
-        # Debug authentication
-        print(f"=== BACKEND EVENT CREATION DEBUG ===")
-        print(f"User authenticated: {self.request.user.is_authenticated}")
-        print(f"User: {self.request.user}")
-        print(f"User ID: {getattr(self.request.user, 'id', None)}")
-        print(f"Request data keys: {list(self.request.data.keys())}")
-        print(f"Services in request: {self.request.data.get('services', [])}")
-        print(f"Event type in request: {self.request.data.get('event_type')}")
-        print(f"Form data keys: {list(form_data.keys()) if form_data else 'No form_data'}")
-        
         # Extract values from form_data for Event model fields
         event_type = self.request.data.get('event_type') or form_data.get('event_type', 'other')
         attendees = self.request.data.get('attendees') or form_data.get('attendees', 50)
@@ -229,7 +186,7 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
         if not services or len(services) == 0:
             services = ['general']  # Fallback
         
-        print(f"Final values - event_type: {event_type}, attendees: {attendees}, duration: {duration}, budget: {total_budget}, services: {services}")
+        # Final values determined
         
         # Determine venue type based on event details
         venue_type = 'indoor'  # Default, could be enhanced based on form data
@@ -1145,15 +1102,16 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
             except User.DoesNotExist:
                 pass
         
-        # Link to source event if prefilled_event_id is provided
-        prefilled_event_id = self.request.data.get('prefilled_event_id')
-        source_event = None
-        if prefilled_event_id:
+        # Link to source event if provided
+        source_event_id = self.request.data.get('source_event')
+        if source_event_id:
             try:
-                source_event = Event.objects.get(id=prefilled_event_id)
+                source_event = Event.objects.get(id=source_event_id)
                 save_kwargs['source_event'] = source_event
             except Event.DoesNotExist:
                 pass
+        else:
+            source_event = None
         
         # Generate category-specific data if this is a targeted quote
         quote_type = self.request.data.get('quote_type', 'comprehensive')
@@ -1229,6 +1187,42 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=True, methods=['post'], url_path='submit-vendor-quote')
+    def submit_vendor_quote(self, request, pk=None):
+        """Submit a vendor quote response"""
+        try:
+            quote_request = self.get_object()
+            
+            vendor_data = {
+                'vendor_name': request.data.get('vendor_name'),
+                'category': request.data.get('category'),
+                'quote_amount': request.data.get('quote_amount'),
+                'message': request.data.get('message', ''),
+                'includes': request.data.get('includes', []),
+                'excludes': request.data.get('excludes', []),
+                'terms': request.data.get('terms', ''),
+                'contact_info': request.data.get('contact_info', {}),
+                'status': 'submitted',
+                'submitted_at': timezone.now().isoformat()
+            }
+            
+            # Update vendor responses
+            if not quote_request.vendor_responses:
+                quote_request.vendor_responses = {}
+            
+            vendor_id = f"{vendor_data['category']}_{vendor_data['vendor_name'].replace(' ', '_')}"
+            quote_request.vendor_responses[vendor_id] = vendor_data
+            quote_request.save()
+            
+            return Response({
+                'message': 'Quote submitted successfully',
+                'vendor_id': vendor_id,
+                'quote_data': vendor_data
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=False, methods=['get'], url_path='by-event')
     def get_quotes_by_event(self, request):
         """Get all quote requests for a specific event"""
@@ -1273,6 +1267,40 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
     
+    @action(detail=True, methods=['get'], url_path='quote-details')
+    def get_quote_details(self, request, pk=None):
+        """Get detailed quote information for customer view"""
+        try:
+            quote_request = self.get_object()
+            
+            # Count vendor responses by category
+            vendor_responses = quote_request.vendor_responses or {}
+            category_stats = {}
+            
+            for category, category_data in quote_request.category_specific_data.items():
+                category_responses = [r for r in vendor_responses.values() if r.get('category') == category]
+                category_stats[category] = {
+                    'budget_allocated': category_data.get('budget', 0),
+                    'vendors_contacted': 2,  # Simplified count
+                    'responses_received': len(category_responses),
+                    'quotes_submitted': len([r for r in category_responses if r.get('status') == 'submitted']),
+                    'quotes_accepted': len([r for r in category_responses if r.get('status') == 'accepted'])
+                }
+            
+            return Response({
+                'quote_id': quote_request.id,
+                'event_name': quote_request.event_name,
+                'status': quote_request.status,
+                'created_at': quote_request.created_at,
+                'category_stats': category_stats,
+                'total_vendors_contacted': sum(stats['vendors_contacted'] for stats in category_stats.values()),
+                'total_responses': sum(stats['responses_received'] for stats in category_stats.values()),
+                'total_quotes_submitted': sum(stats['quotes_submitted'] for stats in category_stats.values())
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=True, methods=['get'], url_path='category-data')
     def get_category_data(self, request, pk=None):
         """Get category-specific data for a vendor category"""
@@ -1295,21 +1323,25 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Format response with only relevant information
+            # Format response with only relevant information for this category
             response_data = {
                 'quote_id': quote_request.id,
                 'event_type': quote_request.event_type,
                 'event_name': quote_request.event_name,
                 'client_name': quote_request.client_name,
+                'client_email': quote_request.client_email,
+                'client_phone': quote_request.client_phone,
                 'event_date': quote_request.event_date,
                 'location': quote_request.location,
                 'guest_count': quote_request.guest_count,
+                'urgency': quote_request.urgency,
                 'category': vendor_category,
+                'services': [vendor_category],  # Only this category
                 'requirements': category_data.get('requirements', {}),
                 'allocated_budget': category_data.get('budget', 0),
                 'budget_details': category_data.get('details', {}),
-                'urgency': quote_request.urgency,
-                'description': quote_request.description
+                'category_description': f'This quote is specifically for {vendor_category.replace("_", " ").title()} services only.',
+                'note': f'You are only required to provide {vendor_category.replace("_", " ").title()} services. Other services will be handled by other vendors.'
             }
             
             return Response(response_data)
@@ -1325,24 +1357,43 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
         """Get all quotes relevant to a specific vendor category"""
         vendor_category = request.query_params.get('category')
         
-        if not vendor_category:
-            return Response(
-                {'error': 'category parameter is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         try:
-            # Get all targeted quotes that have data for this category
-            quotes = self.get_queryset().filter(
-                quote_type='targeted',
-                category_specific_data__has_key=vendor_category
-            )
-            
-            vendor_quotes = []
-            for quote in quotes:
-                category_data = quote.get_category_data_for_vendor(vendor_category)
-                if category_data:
+            if vendor_category:
+                # Get quotes for specific category
+                quotes = self.get_queryset().filter(
+                    quote_type='targeted',
+                    category_specific_data__has_key=vendor_category
+                )
+                
+                vendor_quotes = []
+                for quote in quotes:
+                    category_data = quote.get_category_data_for_vendor(vendor_category)
+                    if category_data:
+                        vendor_quotes.append({
+                            'id': quote.id,
+                            'quote_id': quote.id,
+                            'event_type': quote.event_type,
+                            'event_name': quote.event_name,
+                            'client_name': quote.client_name,
+                            'event_date': quote.event_date,
+                            'location': quote.location,
+                            'guest_count': quote.guest_count,
+                            'budget_range': quote.budget_range,
+                            'services': quote.services,
+                            'description': quote.description,
+                            'allocated_budget': category_data.get('budget', 0),
+                            'requirements_count': len(category_data.get('requirements', {})),
+                            'urgency': quote.urgency,
+                            'status': quote.status,
+                            'created_at': quote.created_at
+                        })
+            else:
+                # Return all pending quotes
+                quotes = self.get_queryset().filter(status='pending')
+                vendor_quotes = []
+                for quote in quotes:
                     vendor_quotes.append({
+                        'id': quote.id,
                         'quote_id': quote.id,
                         'event_type': quote.event_type,
                         'event_name': quote.event_name,
@@ -1350,23 +1401,25 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
                         'event_date': quote.event_date,
                         'location': quote.location,
                         'guest_count': quote.guest_count,
-                        'allocated_budget': category_data.get('budget', 0),
-                        'requirements_count': len(category_data.get('requirements', {})),
+                        'budget_range': quote.budget_range,
+                        'services': quote.services,
+                        'description': quote.description,
                         'urgency': quote.urgency,
                         'status': quote.status,
                         'created_at': quote.created_at
                     })
             
             return Response({
-                'category': vendor_category,
+                'success': True,
+                'category': vendor_category or 'all',
                 'total_quotes': len(vendor_quotes),
-                'quotes': vendor_quotes
+                'quote_requests': vendor_quotes
             })
             
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'success': False, 'error': str(e), 'quote_requests': []}, 
+                status=status.HTTP_200_OK
             )
     
     @action(detail=True, methods=['post'], url_path='notify-vendors')
@@ -1412,6 +1465,45 @@ class QuoteRequestViewSet(viewsets.ModelViewSet):
                     'notified_vendors': notified_emails,
                     'quote_type': 'comprehensive'
                 })
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete a quote request"""
+        try:
+            quote_request = self.get_object()
+            
+            # Check if user owns this quote
+            if quote_request.user and quote_request.user != request.user:
+                return Response(
+                    {'error': 'You can only delete your own quote requests'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            quote_request.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['delete'], url_path='clear-all')
+    def clear_all_quotes(self, request):
+        """Clear all quote requests for the authenticated user"""
+        try:
+            # Delete all quotes for the user
+            deleted_count = self.get_queryset().delete()[0]
+            
+            return Response({
+                'message': f'Successfully deleted {deleted_count} quote requests',
+                'deleted_count': deleted_count
+            })
             
         except Exception as e:
             return Response(

@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress"
 import { FileText, Clock, Users, MapPin, Calendar, Eye, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
 
 interface QuoteManagementProps {
   onNavigate?: (component: string) => void
@@ -29,35 +30,59 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
 
   const loadQuotes = async () => {
     try {
-      // Try API first
-      const { apiService } = await import('../../services/api')
-      const apiQuotes = await apiService.getQuoteRequests()
-      setQuotes(apiQuotes)
-      
-      // Calculate stats
-      setStats({
-        total: apiQuotes.length,
-        pending: apiQuotes.filter(q => q.status === 'pending').length,
-        completed: apiQuotes.filter(q => q.status === 'completed').length,
-        targeted: apiQuotes.filter(q => q.quote_type === 'targeted').length
+      const response = await fetch('http://127.0.0.1:8000/api/quote-requests/', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('access_token') && {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          })
+        }
       })
-    } catch (error) {
-      // Fallback to localStorage
-      const userStr = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        const userId = user.id || user.email || user.username
-        const userQuotesKey = `userQuotes_${userId}`
-        const localQuotes = JSON.parse(localStorage.getItem(userQuotesKey) || '[]')
-        setQuotes(localQuotes)
+      
+      if (response.ok) {
+        const apiQuotes = await response.json()
         
+        // Fetch detailed data for each quote
+        const quotesWithDetails = await Promise.all(
+          apiQuotes.map(async (quote: any) => {
+            try {
+              const detailResponse = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quote.id}/quote-details/`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(localStorage.getItem('access_token') && {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                  })
+                }
+              })
+              if (detailResponse.ok) {
+                const details = await detailResponse.json()
+                return { ...quote, ...details }
+              }
+            } catch (error) {
+              console.error(`Error fetching details for quote ${quote.id}:`, error)
+            }
+            return quote
+          })
+        )
+        
+        setQuotes(quotesWithDetails)
+        
+        // Calculate real-time stats
         setStats({
-          total: localQuotes.length,
-          pending: localQuotes.filter(q => q.status === 'pending').length,
-          completed: localQuotes.filter(q => q.status === 'completed').length,
-          targeted: localQuotes.filter(q => q.quote_type === 'targeted').length
+          total: quotesWithDetails.length,
+          pending: quotesWithDetails.filter(q => q.status === 'pending').length,
+          completed: quotesWithDetails.filter(q => q.status === 'completed').length,
+          targeted: quotesWithDetails.filter(q => q.quote_type === 'targeted').length
         })
+      } else {
+        console.error('API response not ok:', response.status)
+        setQuotes([])
+        setStats({ total: 0, pending: 0, completed: 0, targeted: 0 })
       }
+    } catch (error) {
+      console.error('Error loading quotes:', error)
+      setQuotes([])
+      setStats({ total: 0, pending: 0, completed: 0, targeted: 0 })
     }
   }
 
@@ -88,16 +113,103 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
     })
   }
 
-  const handleViewQuote = (quote: any) => {
-    setSelectedQuote(quote)
+  const handleViewQuote = async (quote: any) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quote.id}/quote-details/`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('access_token') && {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          })
+        }
+      })
+      if (response.ok) {
+        const quoteDetails = await response.json()
+        setSelectedQuote({ ...quote, ...quoteDetails })
+      } else {
+        setSelectedQuote(quote)
+      }
+    } catch (error) {
+      console.error('Error fetching quote details:', error)
+      setSelectedQuote(quote)
+    }
     setIsDetailModalOpen(true)
+  }
+
+  const handleClearAllQuotes = async () => {
+    if (window.confirm('Are you sure you want to clear all quote requests? This action cannot be undone.')) {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/quote-requests/clear-all/', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(localStorage.getItem('access_token') && {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            })
+          }
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          await loadQuotes()
+          
+          toast({
+            title: "Success",
+            description: result.message || "All quote requests have been cleared.",
+          })
+        } else {
+          throw new Error('Failed to clear quotes')
+        }
+      } catch (error) {
+        console.error('Error clearing quotes:', error)
+        toast({
+          title: "Error",
+          description: "Failed to clear quote requests. Please try again.",
+          variant: "destructive"
+        })
+      }
+    }
+  }
+
+  const loadVendorResponses = async (quoteId: number) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quoteId}/responses/`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('access_token') && {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          })
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.responses || []
+      }
+    } catch (error) {
+      console.error('Error loading vendor responses:', error)
+    }
+    return []
   }
 
   return (
     <div className="p-6 w-full max-w-full mx-0 bg-white min-h-screen">
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg p-6 mb-6 text-white">
-        <h1 className="text-2xl font-semibold text-white mb-2">Quote Management</h1>
-        <p className="text-white/90">Track and manage all your quote requests</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-semibold text-white mb-2">Quote Management</h1>
+            <p className="text-white/90">Track and manage all your quote requests</p>
+          </div>
+          {quotes.length > 0 && (
+            <Button 
+              variant="outline" 
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              onClick={handleClearAllQuotes}
+            >
+              Clear All Quotes
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -164,12 +276,20 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No quote requests yet</p>
-              <Button 
-                className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                onClick={() => onNavigate?.('dashboard')}
-              >
-                Request Your First Quote
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <Button 
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                  onClick={() => onNavigate?.('dashboard')}
+                >
+                  Request Your First Quote
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => onNavigate?.('create-event')}
+                >
+                  Create Event First
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -179,7 +299,7 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-medium text-gray-900">
-                          {quote.event_name || `${quote.event_type} Event`}
+                          {quote.event_name || `${quote.event_type?.charAt(0).toUpperCase() + quote.event_type?.slice(1)} Event`}
                         </h3>
                         <Badge className={getStatusColor(quote.status)}>
                           {quote.status?.replace('_', ' ') || 'pending'}
@@ -206,8 +326,10 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                         </div>
                       </div>
 
-                      {quote.services && quote.services.length > 0 && (
+                      {/* Show services */}
+                      {quote.services && Array.isArray(quote.services) && quote.services.length > 0 && (
                         <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-700 mb-1">Services Requested:</p>
                           <div className="flex flex-wrap gap-1">
                             {quote.services.slice(0, 3).map((service: string, idx: number) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
@@ -223,23 +345,74 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                         </div>
                       )}
 
-                      {quote.vendor_count > 0 && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          Sent to {quote.vendor_count} selected vendors
+                      {/* Quote status info */}
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="text-sm font-medium text-blue-900 mb-2">Quote Status</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div className="text-center">
+                            <div className="font-semibold text-blue-600">{quote.services?.length || 0}</div>
+                            <div className="text-blue-700">Services</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-semibold text-green-600">{quote.budget_range || 'Not specified'}</div>
+                            <div className="text-green-700">Budget</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-semibold text-purple-600">{quote.urgency || 'medium'}</div>
+                            <div className="text-purple-700">Priority</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-semibold text-orange-600">{Object.keys(quote.vendor_responses || {}).length}</div>
+                            <div className="text-orange-700">Responses</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Vendor Responses Preview */}
+                      {quote.vendor_responses && Object.keys(quote.vendor_responses).length > 0 && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <h4 className="text-sm font-medium text-green-900 mb-2">📋 Vendor Responses ({Object.keys(quote.vendor_responses).length})</h4>
+                          <div className="space-y-2">
+                            {Object.entries(quote.vendor_responses).slice(0, 3).map(([vendorName, response]: [string, any]) => (
+                              <div key={vendorName} className="flex items-center justify-between p-2 bg-white rounded border">
+                                <div>
+                                  <div className="font-medium text-sm">{vendorName}</div>
+                                  <div className="text-xs text-gray-600">{response.vendor_business}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold text-green-600">₹{response.quote_amount?.toLocaleString()}</div>
+                                  <div className="text-xs text-gray-500">{new Date(response.submitted_at).toLocaleDateString()}</div>
+                                </div>
+                              </div>
+                            ))}
+                            {Object.keys(quote.vendor_responses).length > 3 && (
+                              <div className="text-xs text-center text-gray-600 pt-1">
+                                +{Object.keys(quote.vendor_responses).length - 3} more responses
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
 
                     <div className="flex items-center gap-2 ml-4">
                       {getUrgencyIcon(quote.urgency)}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleViewQuote(quote)}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex flex-col gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleViewQuote(quote)}
+                          className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
+                        </Button>
+                        {quote.vendor_responses && Object.keys(quote.vendor_responses).length > 0 && (
+                          <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1">
+                            {Object.keys(quote.vendor_responses).length} Response{Object.keys(quote.vendor_responses).length > 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -277,16 +450,87 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                   </Badge>
                 </div>
 
+                {/* Quote Statistics */}
+                {selectedQuote.category_stats && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-3">Quote Progress</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="text-center p-3 bg-blue-50 rounded">
+                        <div className="text-xl font-bold text-blue-600">
+                          {selectedQuote.total_vendors_contacted || 0}
+                        </div>
+                        <div className="text-xs text-gray-600">Vendors Contacted</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded">
+                        <div className="text-xl font-bold text-green-600">
+                          {selectedQuote.total_responses || 0}
+                        </div>
+                        <div className="text-xs text-gray-600">Responses Received</div>
+                      </div>
+                      <div className="text-center p-3 bg-purple-50 rounded">
+                        <div className="text-xl font-bold text-purple-600">
+                          {selectedQuote.total_quotes_submitted || 0}
+                        </div>
+                        <div className="text-xs text-gray-600">Quotes Submitted</div>
+                      </div>
+                    </div>
+                    
+                    {/* Category Breakdown */}
+                    <div className="space-y-3">
+                      <h5 className="text-sm font-medium text-gray-700">Category Breakdown</h5>
+                      {Object.entries(selectedQuote.category_stats || {}).map(([category, stats]: [string, any]) => (
+                        <div key={category} className="border border-gray-200 rounded p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium capitalize">{category.replace('_', ' ')}</span>
+                            <span className="text-sm text-green-600 font-medium">
+                              ₹{stats.budget_allocated?.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <div className="text-gray-600">Contacted</div>
+                              <div className="font-medium">{stats.vendors_contacted}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600">Responded</div>
+                              <div className="font-medium">{stats.responses_received}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600">Quotes</div>
+                              <div className="font-medium">{stats.quotes_submitted}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600">Accepted</div>
+                              <div className="font-medium text-green-600">{stats.quotes_accepted}</div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Response Rate</span>
+                              <span>{Math.round((stats.responses_received / stats.vendors_contacted) * 100)}%</span>
+                            </div>
+                            <Progress 
+                              value={(stats.responses_received / stats.vendors_contacted) * 100} 
+                              className="h-1"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Event Details</h4>
                       <div className="space-y-2 text-sm">
-                        <div><strong>Type:</strong> {selectedQuote.event_type}</div>
+                        <div><strong>Type:</strong> {selectedQuote.event_type?.charAt(0).toUpperCase() + selectedQuote.event_type?.slice(1)}</div>
                         <div><strong>Date:</strong> {formatDate(selectedQuote.event_date)}</div>
                         <div><strong>Location:</strong> {selectedQuote.location || 'TBD'}</div>
                         <div><strong>Guests:</strong> {selectedQuote.guest_count || 0}</div>
                         <div><strong>Budget:</strong> {selectedQuote.budget_range || 'Not specified'}</div>
+                        <div><strong>Urgency:</strong> {selectedQuote.urgency || 'medium'}</div>
                       </div>
                     </div>
                   </div>
@@ -305,7 +549,7 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                   </div>
                 </div>
 
-                {selectedQuote.services && selectedQuote.services.length > 0 && (
+                {selectedQuote.services && Array.isArray(selectedQuote.services) && selectedQuote.services.length > 0 && (
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Required Services</h4>
                     <div className="flex flex-wrap gap-2">
@@ -324,8 +568,104 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                     <div className="space-y-2">
                       {selectedQuote.selected_vendors.map((vendor: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="font-medium">{vendor.name}</span>
-                          <Badge variant="outline">{vendor.category}</Badge>
+                          <span className="font-medium">{typeof vendor === 'string' ? vendor : vendor.name}</span>
+                          <Badge variant="outline">{typeof vendor === 'string' ? 'Vendor' : vendor.category}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vendor Responses Section */}
+                {selectedQuote.vendor_responses && Object.keys(selectedQuote.vendor_responses).length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">💼 Vendor Responses ({Object.keys(selectedQuote.vendor_responses).length})</h4>
+                    <div className="space-y-4">
+                      {Object.entries(selectedQuote.vendor_responses).map(([vendorName, response]: [string, any]) => (
+                        <div key={vendorName} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-green-50 to-blue-50">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h5 className="font-semibold text-lg">{vendorName}</h5>
+                              <p className="text-sm text-gray-600">{response.vendor_business}</p>
+                              <p className="text-xs text-gray-500">{response.vendor_location}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-green-600">₹{response.quote_amount?.toLocaleString()}</div>
+                              <div className="text-xs text-gray-500">{new Date(response.submitted_at).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                          
+                          {response.message && (
+                            <div className="mb-3">
+                              <p className="text-sm font-medium text-gray-700 mb-1">Message:</p>
+                              <p className="text-sm text-gray-600 bg-white p-2 rounded border">{response.message}</p>
+                            </div>
+                          )}
+                          
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {response.includes && response.includes.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-green-700 mb-1">✅ What's Included:</p>
+                                <ul className="text-sm text-gray-600 space-y-1">
+                                  {response.includes.map((item: string, idx: number) => (
+                                    <li key={idx} className="flex items-center">
+                                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            
+                            {response.excludes && response.excludes.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-red-700 mb-1">❌ What's Not Included:</p>
+                                <ul className="text-sm text-gray-600 space-y-1">
+                                  {response.excludes.map((item: string, idx: number) => (
+                                    <li key={idx} className="flex items-center">
+                                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {response.terms && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="text-sm font-medium text-gray-700 mb-1">📋 Terms & Conditions:</p>
+                              <p className="text-sm text-gray-600 bg-white p-2 rounded border">{response.terms}</p>
+                            </div>
+                          )}
+                          
+                          <div className="mt-3 pt-3 border-t flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => {
+                                toast({
+                                  title: "Quote Accepted!",
+                                  description: `You've accepted ${vendorName}'s quote of ₹${response.quote_amount?.toLocaleString()}`,
+                                })
+                              }}
+                            >
+                              ✅ Accept Quote
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // Open chat or contact vendor
+                                toast({
+                                  title: "Contact Vendor",
+                                  description: `Opening chat with ${vendorName}`,
+                                })
+                              }}
+                            >
+                              💬 Contact Vendor
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -345,6 +685,11 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
                   <div>Created: {formatDate(selectedQuote.created_at || selectedQuote.createdAt)}</div>
                   {selectedQuote.estimated_response_time && (
                     <div>Expected response: {selectedQuote.estimated_response_time}</div>
+                  )}
+                  {selectedQuote.vendor_responses && Object.keys(selectedQuote.vendor_responses).length > 0 && (
+                    <div className="mt-2 p-2 bg-green-100 rounded">
+                      <span className="font-medium text-green-800">🎉 Great news! You have {Object.keys(selectedQuote.vendor_responses).length} vendor response{Object.keys(selectedQuote.vendor_responses).length > 1 ? 's' : ''} to review.</span>
+                    </div>
                   )}
                 </div>
               </div>

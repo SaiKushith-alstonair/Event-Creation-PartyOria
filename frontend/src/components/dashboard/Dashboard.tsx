@@ -167,24 +167,28 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
       value: events.length.toString(),
       icon: <CalendarIcon className="h-6 w-6 text-purple-600" />,
       change: events.length > 0 ? `+${events.length}` : "",
+      description: "Total events created"
     },
     {
-      title: "Hired Vendors",
+      title: "Quote Requests",
       value: totalVendorsHired.toString(),
-      icon: <Users className="h-6 w-6 text-pink-600" />,
+      icon: <FileText className="h-6 w-6 text-blue-600" />,
       change: totalVendorsHired > 0 ? `+${totalVendorsHired}` : "",
+      description: "Quotes sent to vendors"
     },
     {
       title: "Upcoming Events",
       value: upcomingEventsCount.toString(),
-      icon: <Clock className="h-6 w-6 text-purple-600" />,
+      icon: <Clock className="h-6 w-6 text-orange-600" />,
       change: upcomingEventsCount > 0 ? `+${upcomingEventsCount}` : "",
+      description: "Events in planning"
     },
     {
       title: "Total Budget",
       value: totalSpentAmount > 0 ? `₹${Math.round(totalSpentAmount / 1000)}K` : "₹0",
-      icon: <TrendingUp className="h-6 w-6 text-success-600" />,
+      icon: <DollarSign className="h-6 w-6 text-green-600" />,
       change: "",
+      description: "Budget allocated"
     },
   ]
 
@@ -251,30 +255,33 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <Button 
-            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center"
+            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
             onClick={() => onNavigate?.('create-event')}
           >
             <Zap className="mr-2 h-4 w-4" /> Create Event
           </Button>
-          <Button className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center">
-            <Search className="mr-2 h-4 w-4" /> Find Vendors
-          </Button>
           <Button 
-            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center"
+            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
             onClick={() => onNavigate?.('requote')}
           >
             <FileText className="mr-2 h-4 w-4" /> Request Quote
           </Button>
           <Button 
-            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center"
-            onClick={() => onNavigate?.('quotes')}
+            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
+            onClick={() => onNavigate?.('quote-management')}
           >
-            <Eye className="mr-2 h-4 w-4" /> View Quotes
+            <TrendingUp className="mr-2 h-4 w-4" /> Quote Progress
           </Button>
           <Button 
-            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center"
+            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
+            onClick={() => onNavigate?.('budget-analytics')}
+          >
+            <DollarSign className="mr-2 h-4 w-4" /> Budget Analytics
+          </Button>
+          <Button 
+            className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
             onClick={() => onNavigate?.('rsvp-manager')}
           >
             <UserCheck className="mr-2 h-4 w-4" /> RSVP Manager
@@ -319,6 +326,10 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
             onClick={() => {
               if (stat.title === "My Events") {
                 onNavigate?.('my-events');
+              } else if (stat.title === "Total Budget") {
+                onNavigate?.('budget-analytics');
+              } else if (stat.title === "Hired Vendors") {
+                onNavigate?.('quote-management');
               }
             }}
           >
@@ -327,6 +338,7 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <div className="flex-1">
                   <p className="text-xs lg:text-sm text-gray-600">{stat.title}</p>
                   <h3 className="text-lg lg:text-2xl font-semibold text-gray-900 mt-1">{stat.value}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
                   {stat.change && (
                     <span className="text-xs text-green-600 hidden lg:inline">{stat.change}</span>
                   )}

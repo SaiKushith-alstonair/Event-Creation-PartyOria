@@ -34,12 +34,12 @@ def customer_quote_status(request, event_id):
         # Get all quote requests for this event
         if user_filter:
             quote_requests = QuoteRequest.objects.filter(
-                prefilled_event_id=event_id,
+                source_event_id=event_id,
                 user=user_filter
             ).order_by('-created_at')
         else:
             quote_requests = QuoteRequest.objects.filter(
-                prefilled_event_id=event_id
+                source_event_id=event_id
             ).order_by('-created_at')
         
         quotes_data = []
@@ -216,12 +216,12 @@ def quote_responses_for_event(request, event_id):
         
         if user_filter:
             quote_requests = QuoteRequest.objects.filter(
-                prefilled_event_id=event_id,
+                source_event_id=event_id,
                 user=user_filter
             )
         else:
             quote_requests = QuoteRequest.objects.filter(
-                prefilled_event_id=event_id
+                source_event_id=event_id
             )
         
         all_responses = []

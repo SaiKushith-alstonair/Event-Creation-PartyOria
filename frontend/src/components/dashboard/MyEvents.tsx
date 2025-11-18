@@ -22,15 +22,11 @@ export default function MyEvents() {
   const loadEvents = async () => {
     setLoading(true);
     try {
-      const [localEvents, backendEvents] = await Promise.all([
-        eventStorage.getAllEvents(),
-        apiService.getEvents()
-      ]);
-      setEvents(localEvents);
+      const backendEvents = await apiService.getEvents();
       setApiEvents(backendEvents);
     } catch (error) {
       console.error('Error loading events:', error);
-      setEvents(eventStorage.getAllEvents());
+      setApiEvents([]);
     } finally {
       setLoading(false);
     }
@@ -51,27 +47,16 @@ export default function MyEvents() {
     };
   }, []);
 
-  const handleDelete = async (eventId: string, isApiEvent = false) => {
+  const handleDelete = async (eventId: string) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
       try {
-        if (isApiEvent) {
-          await apiService.deleteEvent(parseInt(eventId));
-          setApiEvents(prev => prev.filter(e => e.id !== parseInt(eventId)));
-        } else {
-          eventStorage.deleteEvent(eventId);
-          setEvents(eventStorage.getAllEvents());
-        }
+        await apiService.deleteEvent(parseInt(eventId));
+        await loadEvents();
         alert('Event deleted successfully!');
       } catch (error) {
         console.error('Error deleting event:', error);
-        if (error instanceof Error && (error.message.includes('404') || error.message.includes('204'))) {
-          if (isApiEvent) {
-            setApiEvents(prev => prev.filter(e => e.id !== parseInt(eventId)));
-          }
-          alert('Event deleted successfully!');
-        } else {
-          alert('Error deleting event. Please try again.');
-        }
+        await loadEvents();
+        alert('Failed to delete event. It may not exist or you may not have permission.');
       }
     }
   };
@@ -80,7 +65,7 @@ export default function MyEvents() {
     navigate(`/event-creation?edit=${eventId}&section=${sectionId}&subsection=${subsectionId}`);
   };
 
-  const allEvents = [...events, ...apiEvents.map(e => ({
+  const allEvents = apiEvents.map(e => ({
     id: e.id!.toString(),
     eventName: e.event_name,
     clientName: e.form_data?.clientName || '',
@@ -109,7 +94,7 @@ export default function MyEvents() {
     createdAt: e.created_at || new Date().toISOString(),
     updatedAt: e.updated_at || new Date().toISOString(),
     isApiEvent: true
-  }))];
+  }));
 
   const toggleFavorite = (eventId: string) => {
     setFavorites(prev => {
@@ -375,7 +360,7 @@ export default function MyEvents() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDelete(event.id, (event as any).isApiEvent);
+                      handleDelete(event.id);
                     }}
                     className="flex items-center justify-center px-2 py-2 text-xs font-semibold text-red-600 hover:bg-red-50/80 rounded-md border border-red-200/60 hover:border-red-300 transition-all duration-300 shadow-sm hover:shadow-md"
                   >

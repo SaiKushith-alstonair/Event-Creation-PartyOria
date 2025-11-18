@@ -206,58 +206,69 @@ export default function QuoteRequestModal({ isOpen, onClose, prefilledEvent, sel
     setIsSubmitting(true)
 
     try {
-      // Try to submit via API first
-      try {
-        const { apiService, convertQuoteFormToApiData } = await import('../services/api')
-        const apiData = convertQuoteFormToApiData({
-          ...formData,
-          quoteType,
-          expandVendors,
-          prefilledEventId: prefilledEvent?.id,
-          selectedVendors: formData.selectedVendors,
-          selectedVenues: formData.selectedVenues
-        })
-        const response = await apiService.createQuoteRequest(apiData)
+      const apiData = {
+        event_type: formData.eventType || 'other',
+        event_name: formData.eventName || 'Untitled Event',
+        client_name: formData.clientName || 'Unknown Client',
+        client_email: formData.clientEmail || 'client@example.com',
+        client_phone: formData.clientPhone || '',
+        event_date: formData.eventDate || new Date().toISOString().split('T')[0],
+        location: formData.location || '',
+        guest_count: parseInt(formData.guestCount) || 0,
+        budget_range: formData.budget || '',
+        services: [...formData.selectedVendors, ...formData.selectedVenues],
+        description: formData.specialRequirements || '',
+        urgency: formData.urgency || 'medium',
+        quote_type: quoteType || 'comprehensive',
+        expand_vendors: expandVendors || false,
+        prefilled_event_id: prefilledEvent?.id || null,
+        selected_vendors: formData.selectedVendors.map(v => ({ name: v, category: v })),
+        selected_venues: formData.selectedVenues.map(v => ({ name: v, category: v }))
+      }
+
+      const response = await fetch('http://127.0.0.1:8000/api/quote-requests/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('access_token') && {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          })
+        },
+        body: JSON.stringify(apiData)
+      })
+
+      if (response.ok) {
+        const quoteData = await response.json()
+        
+        // If this is for a prefilled event, send quotes to vendors
+        if (prefilledEvent?.id) {
+          try {
+            const sendQuotesResponse = await fetch(`http://127.0.0.1:8000/api/events/${prefilledEvent.id}/send-quotes/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(localStorage.getItem('access_token') && {
+                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                })
+              }
+            })
+            
+            if (sendQuotesResponse.ok) {
+              const sendData = await sendQuotesResponse.json()
+              console.log('Quotes sent to vendors:', sendData)
+            }
+          } catch (sendError) {
+            console.error('Error sending quotes to vendors:', sendError)
+          }
+        }
         
         setIsSubmitted(true)
         toast({
           title: "Quote Request Submitted!",
           description: "We'll get back to you within 24-48 hours with a detailed quote.",
         })
-      } catch (apiError) {
-        console.warn('API submission failed, using localStorage fallback:', apiError)
-        
-        // Fallback to localStorage
-        const quoteId = `quote_${Date.now()}`
-        const quoteRequest = {
-          id: quoteId,
-          ...formData,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          estimatedResponse: '24-48 hours'
-        }
-
-        // Store in localStorage
-        const existingQuotes = JSON.parse(localStorage.getItem('quoteRequests') || '[]')
-        existingQuotes.push(quoteRequest)
-        localStorage.setItem('quoteRequests', JSON.stringify(existingQuotes))
-
-        // Store user-specific quotes
-        const userStr = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user')
-        if (userStr) {
-          const user = JSON.parse(userStr)
-          const userId = user.id || user.email || user.username
-          const userQuotesKey = `userQuotes_${userId}`
-          const userQuotes = JSON.parse(localStorage.getItem(userQuotesKey) || '[]')
-          userQuotes.push(quoteRequest)
-          localStorage.setItem(userQuotesKey, JSON.stringify(userQuotes))
-        }
-
-        setIsSubmitted(true)
-        toast({
-          title: "Quote Request Submitted!",
-          description: "We'll get back to you within 24-48 hours with a detailed quote.",
-        })
+      } else {
+        throw new Error('Failed to submit quote request')
       }
 
       // Reset form after 3 seconds

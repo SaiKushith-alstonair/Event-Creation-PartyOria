@@ -145,16 +145,12 @@ class RSVPSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'invitation_code', 'guest_name', 'guest_email', 'total_attendees', 'created_at', 'updated_at']
 
 class QuoteRequestSerializer(serializers.ModelSerializer):
-    vendor_count = serializers.ReadOnlyField()
-    venue_count = serializers.ReadOnlyField()
-    estimated_response_time = serializers.ReadOnlyField()
     
     class Meta:
         model = QuoteRequest
         fields = ['id', 'event_type', 'event_name', 'client_name', 'client_email', 'client_phone', 
                  'event_date', 'location', 'guest_count', 'budget_range', 'services', 'description', 
-                 'urgency', 'status', 'quote_type', 'expand_vendors', 'is_targeted_quote', 
-                 'prefilled_event_id', 'selected_vendors', 'selected_venues', 'source_event',
-                 'category_specific_data', 'user', 'vendor_count', 'venue_count', 'estimated_response_time', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'vendor_count', 'venue_count', 'estimated_response_time', 'created_at', 'updated_at']
+                 'urgency', 'status', 'quote_type', 'source_event', 'selected_vendors',
+                 'category_specific_data', 'vendor_responses', 'user', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 

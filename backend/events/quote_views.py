@@ -83,9 +83,8 @@ def send_quote_requests(request, event_id):
             description=event.form_data.get('description', '') if event.form_data else '',
             urgency='medium',
             user=quote_user,
-            prefilled_event_id=event.id,
+            source_event=event,
             selected_vendors=[v.full_name for v in matched_vendors],
-            is_targeted_quote=True,
             quote_type='targeted'
         )
         
@@ -136,12 +135,16 @@ def send_quote_requests(request, event_id):
 def vendor_quote_requests(request):
     """Get pending quote requests for vendor"""
     try:
-        vendor = get_object_or_404(VendorAuth, chat_user=request.user)
+        print(f"[VENDOR QUOTES] Authenticated user: {request.user.email}, ID: {request.user.id}, Type: {request.user.user_type}")
+        # Find vendor by email since JWT token is for CustomUser, not chat_user
+        vendor = get_object_or_404(VendorAuth, email=request.user.email)
+        print(f"[VENDOR QUOTES] Found vendor: {vendor.full_name}, ID: {vendor.id}, Business: {vendor.business}")
         
         quote_requests = QuoteRequest.objects.filter(
             selected_vendors__contains=[vendor.full_name],
             status__in=['pending', 'vendors_notified']
         ).order_by('-created_at')
+        print(f"[VENDOR QUOTES] Found {quote_requests.count()} quote requests for vendor {vendor.full_name}")
         
         data = []
         for qr in quote_requests:
@@ -179,8 +182,8 @@ def vendor_quote_requests(request):
 def quote_request_detail(request, quote_id):
     """Get detailed quote request information"""
     try:
-        vendor = get_object_or_404(VendorAuth, chat_user=request.user)
-        quote_request = get_object_or_404(QuoteRequest, id=quote_id, vendor=vendor)
+        vendor = get_object_or_404(VendorAuth, email=request.user.email)
+        quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
         # Mark as viewed
         if quote_request.status == 'sent':
@@ -227,7 +230,7 @@ def quote_request_detail(request, quote_id):
 def submit_quote(request, quote_id):
     """Submit quote response"""
     try:
-        vendor = get_object_or_404(VendorAuth, chat_user=request.user)
+        vendor = get_object_or_404(VendorAuth, email=request.user.email)
         quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
         # Check if vendor is in selected vendors
@@ -292,7 +295,7 @@ def event_quotes(request, event_id):
         # Find quote requests for this user's events
         quote_requests = QuoteRequest.objects.filter(
             user=request.user,
-            prefilled_event_id=event_id,
+            source_event_id=event_id,
             status__in=['responses_received', 'completed']
         )
         

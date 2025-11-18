@@ -91,6 +91,34 @@ class VendorNotificationService:
         return notification_results
     
     @classmethod
+    def get_vendor_specific_quote_data(cls, quote_request: QuoteRequest, vendor_category: str) -> Dict:
+        """
+        Get only the data relevant to a specific vendor category
+        """
+        category_data = quote_request.category_specific_data.get(vendor_category, {})
+        
+        if not category_data:
+            return {}
+        
+        return {
+            'quote_id': quote_request.id,
+            'event_type': quote_request.event_type,
+            'event_name': quote_request.event_name,
+            'client_name': quote_request.client_name,
+            'client_email': quote_request.client_email,
+            'client_phone': quote_request.client_phone,
+            'event_date': quote_request.event_date,
+            'location': quote_request.location,
+            'guest_count': quote_request.guest_count,
+            'urgency': quote_request.urgency,
+            'category': vendor_category,
+            'allocated_budget': category_data.get('budget', 0),
+            'budget_details': category_data.get('details', {}),
+            'requirements': category_data.get('requirements', {}),
+            'services': [vendor_category]  # Only this category's service
+        }
+    
+    @classmethod
     def _send_category_specific_email(cls, quote_request: QuoteRequest, category: str, 
                                     category_data: Dict, vendor: Dict) -> bool:
         """
@@ -108,7 +136,7 @@ class VendorNotificationService:
             message = f"""
 Dear {vendor['name']},
 
-We have a new quote request specifically for {category.title()} services:
+We have a TARGETED quote request specifically for {category.title()} services only:
 
 EVENT DETAILS:
 - Event Type: {quote_request.event_type.title()}
@@ -119,20 +147,22 @@ EVENT DETAILS:
 - Guest Count: {quote_request.guest_count}
 - Urgency: {quote_request.urgency.title()}
 
-{category.upper()} REQUIREMENTS:
+YOUR CATEGORY: {category.upper()} ONLY
 {requirements_text}
 
-BUDGET ALLOCATION:
+YOUR ALLOCATED BUDGET:
 {budget_info}
 
-ADDITIONAL DETAILS:
-{quote_request.description or 'No additional details provided'}
+IMPORTANT: This is a targeted quote for {category.title()} services only. 
+You are NOT required to provide other services like venues, photography, etc.
+Focus only on your {category.title()} expertise.
 
 To respond to this quote request, please contact:
 Email: {quote_request.client_email}
 Phone: {quote_request.client_phone or 'Not provided'}
 
 Quote ID: {quote_request.id}
+Category: {category.title()}
 Response needed by: {quote_request.estimated_response_time}
 
 Best regards,
@@ -193,16 +223,18 @@ PartyOria Event Management Team
         if not budget:
             return "Budget allocation not specified"
         
-        budget_text = f"Allocated Budget: ₹{budget:,.2f}"
+        budget_text = f"YOUR ALLOCATED BUDGET: ₹{budget:,.2f}"
         
         if details.get('percentage'):
-            budget_text += f" ({details['percentage']:.1f}% of total budget)"
+            budget_text += f" ({details['percentage']:.1f}% of total event budget)"
         
         if details.get('per_guest_cost'):
-            budget_text += f"\nPer Guest Cost: ₹{details['per_guest_cost']:,.2f}"
+            budget_text += f"\nPer Guest Budget: ₹{details['per_guest_cost']:,.2f}"
         
         if details.get('per_hour_cost'):
-            budget_text += f"\nPer Hour Cost: ₹{details['per_hour_cost']:,.2f}"
+            budget_text += f"\nPer Hour Budget: ₹{details['per_hour_cost']:,.2f}"
+        
+        budget_text += "\n\nNOTE: This budget is specifically allocated for your service category only."
         
         return budget_text
     

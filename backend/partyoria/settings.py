@@ -9,9 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver', cast=lambda v: [s.strip() for s in v.split(',')])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -164,6 +164,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'authentication.vendor_jwt_auth.VendorJWTAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
@@ -173,7 +174,7 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSIONING_CLASS': 'partyoria.api_versioning.CustomAPIVersioning',
     'DEFAULT_VERSION': 'v2',
     'ALLOWED_VERSIONS': ['v1', 'v2'],
-    'EXCEPTION_HANDLER': 'partyoria.error_handlers.custom_exception_handler',
+    # 'EXCEPTION_HANDLER': 'partyoria.error_handlers.custom_exception_handler',  # Temporarily disabled for debugging
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     # Throttling disabled for development
@@ -196,6 +197,7 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'TOKEN_TYPE_CLAIM': 'token_type',
+    'USER_AUTHENTICATION_RULE': 'authentication.vendor_jwt_auth.VendorJWTAuthentication.get_user',
 }
 
 # CORS Configuration - Secure for production

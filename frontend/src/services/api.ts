@@ -360,22 +360,9 @@ class ApiService {
   }
 
   async deleteEvent(id: number): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/events/${id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok && response.status !== 204) {
-        safeLog(`Delete failed with status: ${response.status}`);
-        throw new Error(`Failed to delete event (${response.status})`);
-      }
-    } catch (error) {
-      safeLog('Delete event error');
-      throw error;
-    }
+    await this.request<void>(`/events/${id}/`, {
+      method: 'DELETE',
+    });
   }
 
   async searchEvents(query: string, eventType?: string): Promise<ApiEvent[]> {
@@ -491,6 +478,10 @@ class ApiService {
 
   async getQuoteRequests(): Promise<any[]> {
     return this.request<any[]>('/quote-requests/');
+  }
+
+  async getQuoteDetails(quoteId: number): Promise<any> {
+    return this.request<any>(`/quote-requests/${quoteId}/quote-details/`);
   }
 
   // Quote Tracking API
