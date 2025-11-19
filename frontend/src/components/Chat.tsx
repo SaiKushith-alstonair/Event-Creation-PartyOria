@@ -88,6 +88,20 @@ export const Chat: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Listen for vendor chat open event
+  useEffect(() => {
+    const handleOpenVendorChat = (event: any) => {
+      const { vendorName, vendorId } = event.detail;
+      const vendor = availableUsers.find(u => u.id === vendorId || u.username === vendorName);
+      if (vendor) {
+        handleStartConversation(vendor);
+      }
+    };
+    
+    window.addEventListener('openVendorChat', handleOpenVendorChat);
+    return () => window.removeEventListener('openVendorChat', handleOpenVendorChat);
+  }, [availableUsers, currentUser]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
@@ -284,31 +298,41 @@ export const Chat: React.FC = () => {
     
     if (confirm('Are you sure you want to clear your messages? This will only delete messages you sent.')) {
       try {
-        const token = localStorage.getItem('access_token') || 
-                      localStorage.getItem('authToken') || 
-                      localStorage.getItem('token');
+        const authStorage = localStorage.getItem('auth-storage');
+        let token = null;
+        
+        if (authStorage) {
+          try {
+            const parsed = JSON.parse(authStorage);
+            token = parsed?.state?.tokens?.access;
+          } catch (e) {}
+        }
+        
+        if (!token) {
+          token = localStorage.getItem('access_token') || 
+                  localStorage.getItem('authToken') || 
+                  localStorage.getItem('token');
+        }
         
         const vendorProfile = localStorage.getItem('vendor_profile');
-        let authToken = token;
         if (vendorProfile && !token) {
           const vendorData = JSON.parse(vendorProfile);
           if (vendorData.access_token) {
-            authToken = vendorData.access_token;
+            token = vendorData.access_token;
           }
         }
 
-        if (!authToken) return;
+        if (!token) return;
 
         const response = await fetch(`http://localhost:8000/api/chat/conversations/${selectedConversation.id}/clear_my_messages/`, {
           method: 'DELETE',
           headers: {
-            'Authorization': `Bearer ${authToken}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
 
         if (response.ok) {
-          // Reload messages to show updated conversation
           await loadConversationMessages(selectedConversation.id);
         } else {
           console.error('Failed to clear messages:', response.status);
@@ -344,7 +368,7 @@ export const Chat: React.FC = () => {
     }
   };
 
-  const handleStartConversation = async (user: User) => {
+  const handleStartConversation = React.useCallback(async (user: User) => {
     if (!currentUser) return;
     
     const vendorId = currentUser.user_type === 'vendor' ? currentUser.id : user.id;
@@ -365,7 +389,7 @@ export const Chat: React.FC = () => {
     }
     
     setShowUserList(false);
-  };
+  }, [currentUser, conversations, createConversation]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);

@@ -702,11 +702,16 @@ export default function QuoteManagement({ eventId, onNavigate }: QuoteManagement
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                // Open chat or contact vendor
-                                toast({
-                                  title: "Contact Vendor",
-                                  description: `Opening chat with ${vendorName}`,
-                                })
+                                onNavigate?.('messages')
+                                setTimeout(() => {
+                                  window.dispatchEvent(new CustomEvent('openVendorChat', { 
+                                    detail: { 
+                                      vendorName: vendorName,
+                                      vendorId: response.vendor_id,
+                                      vendorBusiness: response.vendor_business 
+                                    } 
+                                  }))
+                                }, 100)
                               }}
                             >
                               💬 Contact Vendor
