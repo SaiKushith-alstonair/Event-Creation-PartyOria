@@ -14,14 +14,22 @@ interface QuoteRequest {
   event_type: string
   requirement_category: string
   budget_allocation: number
+  vendor_budget?: number
+  vendor_category?: string
+  budget_percentage?: number
   event_date: string
   location: string
+  guest_count: number
   attendees: number
   client_name: string
   status: string
   sent_at: string
   expires_at: string
   has_responded: boolean
+  services?: string[]
+  description?: string
+  urgency?: string
+  created_at?: string
 }
 
 interface QuoteRequestDetail {
@@ -43,6 +51,9 @@ interface QuoteRequestDetail {
   }
   requirement_category: string
   budget_allocation: number
+  vendor_budget?: number
+  vendor_category?: string
+  budget_percentage?: number
   expires_at: string
   has_responded: boolean
 }
@@ -243,9 +254,14 @@ export default function QuoteRequests() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <DollarSign className="h-4 w-4" />
-                        <span>{formatCurrency(request.budget_allocation)}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                          <div>
+                            <div className="text-lg font-bold text-green-700">{formatCurrency(request.vendor_budget || 0)}</div>
+                            <div className="text-xs text-green-600 font-medium">Your Budget ({request.budget_percentage || 0}%)</div>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
@@ -253,7 +269,7 @@ export default function QuoteRequests() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Users className="h-4 w-4" />
-                        <span>{request.attendees} guests</span>
+                        <span>{request.guest_count} guests</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <MapPin className="h-4 w-4" />
@@ -310,12 +326,15 @@ export default function QuoteRequests() {
 
               <div className="space-y-6">
                 {/* Category-Specific Notice */}
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-blue-700">
-                        <strong>Category-Specific Quote:</strong> This request is specifically for <strong>{selectedRequest.requirement_category}</strong> services only. 
-                        You are not required to provide other services like venues, photography, etc.
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-500 p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">🎯</div>
+                    <div>
+                      <p className="text-sm font-semibold text-green-900 mb-1">
+                        Targeted Quote Request - Perfect Match for You!
+                      </p>
+                      <p className="text-xs text-green-700">
+                        This customer specifically needs your category of services. You don't need to worry about other services like venues, photography, etc.
                       </p>
                     </div>
                   </div>
@@ -344,15 +363,30 @@ export default function QuoteRequests() {
                 </div>
 
                 {/* Budget & Category */}
-                <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium text-green-900">Your Allocated Budget</h4>
-                      <p className="text-sm text-green-700">Specifically for {selectedRequest.requirement_category} only</p>
-                      <p className="text-xs text-green-600 mt-1">This is your portion of the total event budget</p>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 p-5 rounded-xl shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">💰</span>
+                        <h4 className="font-bold text-green-900 text-lg">Your Allocated Budget</h4>
+                      </div>
+                      <p className="text-sm text-green-700 font-medium mb-1">
+                        Specifically for {selectedRequest.vendor_category || selectedRequest.requirement_category} services only
+                      </p>
+                      <p className="text-xs text-green-600">
+                        This is {selectedRequest.budget_percentage || 0}% of the total event budget, allocated just for your services
+                      </p>
+                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                        💡 <strong>Tip:</strong> Quote competitively within this range for the best chance of acceptance!
+                      </div>
                     </div>
-                    <div className="text-2xl font-bold text-green-900">
-                      {formatCurrency(selectedRequest.budget_allocation)}
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-green-900">
+                        {formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation)}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        {selectedRequest.budget_percentage || 0}% of total
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -410,7 +444,10 @@ export default function QuoteRequests() {
                   <div>
                     <span className="text-gray-600">Your Budget:</span>
                     <div className="font-semibold text-green-600">
-                      {formatCurrency(selectedRequest.budget_allocation)}
+                      {formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ({selectedRequest.budget_percentage || 0}% of total)
                     </div>
                   </div>
                   <div>
@@ -423,11 +460,11 @@ export default function QuoteRequests() {
                   </div>
                   <div>
                     <span className="text-gray-600">Your Service:</span>
-                    <div className="font-medium text-blue-600">{selectedRequest.requirement_category}</div>
+                    <div className="font-medium text-blue-600">{selectedRequest.vendor_category || selectedRequest.requirement_category}</div>
                   </div>
                 </div>
                 <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                  💡 <strong>Note:</strong> Quote only for {selectedRequest.requirement_category} services. Other services handled by other vendors.
+                  💡 <strong>Note:</strong> Quote only for {selectedRequest.vendor_category || selectedRequest.requirement_category} services. Other services handled by other vendors.
                 </div>
               </div>
             )}
@@ -435,7 +472,7 @@ export default function QuoteRequests() {
             {/* Quote Amount - Enhanced */}
             <div className="bg-white border-2 border-green-200 rounded-lg p-4">
               <label className="block text-lg font-semibold text-gray-900 mb-3">
-                💰 Your {selectedRequest?.requirement_category} Quote Amount *
+                💰 Your {selectedRequest?.vendor_category || selectedRequest?.requirement_category} Quote Amount *
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">₹</span>
@@ -449,7 +486,10 @@ export default function QuoteRequests() {
                 />
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Enter your quote for <strong>{selectedRequest?.requirement_category}</strong> services only (Budget: {selectedRequest ? formatCurrency(selectedRequest.budget_allocation) : ''})
+                Enter your quote for <strong>{selectedRequest?.vendor_category || selectedRequest?.requirement_category}</strong> services only
+              </p>
+              <p className="text-xs text-green-600 mt-1 font-medium">
+                💡 Allocated Budget: {selectedRequest ? formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation) : ''} ({selectedRequest?.budget_percentage || 0}% of total)
               </p>
             </div>
 

@@ -69,6 +69,20 @@ def send_quote_requests(request, event_id):
             services.extend(event.form_data['selectedServices'])
         services = list(set(services))  # Remove duplicates
         
+        # Get budget allocations from event
+        budget_allocations = get_budget_allocations(event)
+        
+        # Map vendors to their categories and budgets
+        vendor_category_map = {}
+        for vendor in matched_vendors:
+            vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
+            vendor_category = get_vendor_category(vendor)
+            vendor_category_map[vendor_name] = {
+                'category': vendor_category,
+                'budget': budget_allocations.get(vendor_category, {}).get('amount', 0),
+                'percentage': budget_allocations.get(vendor_category, {}).get('percentage', 0)
+            }
+        
         # Create quote request
         quote_request = QuoteRequest.objects.create(
             event_type=event.event_type,
@@ -86,6 +100,7 @@ def send_quote_requests(request, event_id):
             user=quote_user,
             source_event=event,
             selected_vendors=[f"{v.first_name} {v.last_name}".strip() for v in matched_vendors],
+            category_specific_data=vendor_category_map,
             quote_type='targeted'
         )
         
@@ -151,6 +166,12 @@ def vendor_quote_requests(request):
         
         data = []
         for qr in quote_requests:
+            # Get vendor-specific budget
+            vendor_data = qr.category_specific_data.get(vendor_name, {})
+            vendor_budget = vendor_data.get('budget', 0)
+            vendor_category = vendor_data.get('category', 'general')
+            vendor_percentage = vendor_data.get('percentage', 0)
+            
             data.append({
                 'id': qr.id,
                 'event_name': qr.event_name,
@@ -162,6 +183,9 @@ def vendor_quote_requests(request):
                 'location': qr.location,
                 'guest_count': qr.guest_count,
                 'budget_range': qr.budget_range,
+                'vendor_budget': vendor_budget,
+                'vendor_category': vendor_category,
+                'budget_percentage': vendor_percentage,
                 'services': qr.services,
                 'description': qr.description,
                 'urgency': qr.urgency,
@@ -485,7 +509,7 @@ def map_service_to_category(service):
     
     # Decoration Services
     elif any(word in service_lower for word in ['decoration', 'decor', 'setup', 'design', 'styling', 'theme']):
-        return 'decoration'
+        return 'decoration'  # Changed from 'decorations' to match budget key
     
     # Venue Services
     elif any(word in service_lower for word in ['venue', 'hall', 'location', 'banquet', 'resort', 'hotel']):
@@ -516,26 +540,95 @@ def map_service_to_category(service):
 
 
 
-def get_requirement_budget(event, requirement_id):
-    """Get budget allocation for specific requirement"""
-    if not event.budget_allocations:
-        return Decimal('10000')  # Default budget
+def get_budget_allocations(event):
+    """Get budget allocations from event's Budget model"""
+    try:
+        budget = event.budget
+        allocations = budget.allocations if budget.allocations else {}
+        
+        # Normalize keys to match vendor categories
+        normalized = {}
+        for key, value in allocations.items():
+            # Map budget keys to vendor categories
+            category = map_budget_key_to_category(key)
+            normalized[category] = value
+        
+        return normalized
+    except:
+        # Fallback: calculate default allocations
+        total = float(event.total_budget)
+        return {
+            'photography': {'amount': total * 0.20, 'percentage': 20},
+            'videography': {'amount': total * 0.15, 'percentage': 15},
+            'catering': {'amount': total * 0.40, 'percentage': 40},
+            'decoration': {'amount': total * 0.15, 'percentage': 15},
+            'entertainment': {'amount': total * 0.10, 'percentage': 10}
+        }
+
+def map_budget_key_to_category(budget_key):
+    """Map budget allocation keys to vendor categories"""
+    key_lower = budget_key.lower()
     
-    category = map_requirement_to_category(requirement_id)
+    # Direct matches
+    if 'photography' in key_lower or 'photo' in key_lower:
+        return 'photography'
+    elif 'videography' in key_lower or 'video' in key_lower:
+        return 'videography'
+    elif 'catering' in key_lower or 'food' in key_lower:
+        return 'catering'
+    elif 'decoration' in key_lower or 'decor' in key_lower:
+        return 'decoration'
+    elif 'entertainment' in key_lower or 'music' in key_lower:
+        return 'entertainment'
+    elif 'venue' in key_lower or 'hall' in key_lower:
+        return 'venue'
+    elif 'flower' in key_lower or 'floral' in key_lower:
+        return 'flowers'
+    elif 'transport' in key_lower:
+        return 'transportation'
+    elif 'security' in key_lower:
+        return 'security'
+    else:
+        return budget_key.lower()
+
+def get_vendor_category(vendor):
+    """Get primary category for vendor"""
+    # Check business field first
+    if vendor.business:
+        category = map_service_to_category(vendor.business)
+        # Normalize to match budget keys
+        if category == 'decorations':
+            return 'decoration'
+        return category
     
-    # Map to budget categories
-    budget_mapping = {
-        'catering': 'catering',
-        'photography': 'photography',
-        'videography': 'videography',
-        'music': 'entertainment',
-        'decoration': 'decorations',
-        'flowers': 'decorations',
-        'transportation': 'transport',
-        'security': 'security'
-    }
+    # Check VendorProfile services
+    try:
+        if hasattr(vendor, 'vendor_profile') and vendor.vendor_profile:
+            services = vendor.vendor_profile.profile_data.get('services', [])
+            if services:
+                if isinstance(services, list) and services:
+                    category = map_service_to_category(services[0])
+                elif isinstance(services, str) and services:
+                    category = map_service_to_category(services.split(',')[0])
+                else:
+                    category = 'general'
+                
+                # Normalize
+                if category == 'decorations':
+                    return 'decoration'
+                return category
+    except:
+        pass
     
-    budget_category = budget_mapping.get(category, 'other_services')
-    allocation = event.budget_allocations.get(budget_category, {})
+    # Check VendorService
+    try:
+        service = vendor.vendor_services.first()
+        if service:
+            category = map_service_to_category(service.category)
+            if category == 'decorations':
+                return 'decoration'
+            return category
+    except:
+        pass
     
-    return Decimal(str(allocation.get('amount', 10000)))
+    return 'general'

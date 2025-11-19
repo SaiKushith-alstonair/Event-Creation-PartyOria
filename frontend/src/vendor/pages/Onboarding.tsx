@@ -378,6 +378,14 @@ const Onboarding = () => {
         if (result.data || !result.error) {
           const vendorInfo = result.data.vendor || result.data;
           
+          // Mark onboarding as completed in backend
+          try {
+            await apiService.completeOnboarding();
+            console.log('Onboarding marked as completed in backend');
+          } catch (err) {
+            console.error('Failed to mark onboarding complete:', err);
+          }
+          
           // Store user data
           const userData = {
             id: vendorInfo.id,
@@ -418,7 +426,6 @@ const Onboarding = () => {
           localStorage.setItem('vendorOnboarding', JSON.stringify(vendorOnboarding));
 
           toast.success("Profile setup completed!");
-          // Navigate to vendor dashboard
           navigate('/vendor/dashboard', { replace: true });
         } else {
           toast.error(
