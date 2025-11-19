@@ -212,39 +212,49 @@ def quote_request_detail(request, quote_id):
         vendor = request.user
         if vendor.user_type != 'vendor':
             return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
         quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
-        # Mark as viewed
-        if quote_request.status == 'sent':
-            quote_request.status = 'viewed'
-            quote_request.viewed_at = timezone.now()
-            quote_request.save()
+        # Check if vendor is in selected vendors
+        if vendor_name not in quote_request.selected_vendors:
+            return Response({
+                'success': False,
+                'error': 'Not authorized for this quote'
+            }, status=status.HTTP_403_FORBIDDEN)
         
-        event = quote_request.event
+        # Get vendor-specific data
+        vendor_data = quote_request.category_specific_data.get(vendor_name, {})
+        vendor_budget = vendor_data.get('budget', 0)
+        vendor_category = vendor_data.get('category', 'general')
+        vendor_percentage = vendor_data.get('percentage', 0)
+        
+        # Check if vendor has already responded
+        has_responded = vendor_name in (quote_request.vendor_responses or {})
         
         return Response({
             'success': True,
             'quote_request': {
                 'id': quote_request.id,
                 'event': {
-                    'name': event.event_name,
-                    'type': event.event_type,
-                    'date': event.form_data.get('dateTime'),
-                    'duration': event.form_data.get('duration'),
-                    'location': f"{event.form_data.get('city', '')}, {event.form_data.get('state', '')}",
-                    'attendees': event.attendees,
-                    'description': event.form_data.get('description', ''),
-                    'special_requirements': event.special_requirements
+                    'name': quote_request.event_name,
+                    'type': quote_request.event_type,
+                    'date': quote_request.event_date.isoformat() if quote_request.event_date else None,
+                    'duration': '4 hours',
+                    'location': quote_request.location,
+                    'attendees': quote_request.guest_count,
+                    'description': quote_request.description,
+                    'special_requirements': {}
                 },
                 'client': {
-                    'name': event.form_data.get('clientName', ''),
-                    'email': event.form_data.get('clientEmail', ''),
-                    'phone': event.form_data.get('clientPhone', '')
+                    'name': quote_request.client_name,
+                    'email': quote_request.client_email,
+                    'phone': quote_request.client_phone
                 },
-                'requirement_category': quote_request.requirement_category,
-                'budget_allocation': float(quote_request.budget_allocation),
-                'expires_at': quote_request.expires_at,
-                'has_responded': hasattr(quote_request, 'vendor_quote')
+                'vendor_category': vendor_category,
+                'vendor_budget': vendor_budget,
+                'budget_percentage': vendor_percentage,
+                'has_responded': has_responded
             }
         })
         
@@ -253,6 +263,11 @@ def quote_request_detail(request, quote_id):
             'success': False,
             'error': 'Quote request not found'
         }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

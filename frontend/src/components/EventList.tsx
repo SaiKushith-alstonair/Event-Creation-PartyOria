@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Edit, Trash2, Clock, Eye, Search, Filter, ChevronDown, Heart, Users, MapPin, ArrowLeft, DollarSign } from 'lucide-react';
+import { Calendar, Edit, Trash2, Clock, Eye, Search, Filter, ChevronDown, Heart, Users, MapPin, ArrowLeft, IndianRupee } from 'lucide-react';
 import { eventStorage, StoredEvent } from '../utils/localStorage';
 import { apiService, ApiEvent } from '../services/api';
 import EventDetailsModal from './EventDetailsModal';
@@ -430,7 +430,7 @@ const EventList: React.FC<EventListProps> = ({ onEditEvent, onBack }) => {
                       }}
                       className="flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 transition-all duration-300 shadow-sm hover:shadow-md"
                     >
-                      <DollarSign size={12} />
+                      <IndianRupee size={12} />
                       Budget
                     </button>
                     <button

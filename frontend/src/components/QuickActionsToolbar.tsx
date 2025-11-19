@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { 
-  DollarSign, 
+  IndianRupee, 
   Calendar, 
   FileText, 
   Image as ImageIcon, 
@@ -71,7 +71,7 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
             onClick={() => setShowQuoteForm(!showQuoteForm)}
             className="gap-1"
           >
-            <DollarSign className="h-4 w-4" />
+            <IndianRupee className="h-4 w-4" />
             Send Quote
           </Button>
           
@@ -112,7 +112,7 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
             <h4 className="font-medium text-sm">Send Quote</h4>
             <div className="grid grid-cols-2 gap-2">
               <Input
-                placeholder="Amount ($)"
+                placeholder="Amount (₹)"
                 type="number"
                 value={quoteAmount}
                 onChange={(e) => setQuoteAmount(e.target.value)}

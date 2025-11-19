@@ -6,7 +6,7 @@ import { Badge } from "../../../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
 import { Textarea } from "../../../components/ui/textarea";
-import { Star, MapPin, Mail, Phone, DollarSign, Filter, Loader2, Calendar, Award, Users, Send } from "lucide-react";
+import { Star, MapPin, Mail, Phone, IndianRupee, Filter, Loader2, Calendar, Award, Users, Send } from "lucide-react";
 import { apiService } from "../../services/api";
 
 const getDefaultImage = (category: string) => {
@@ -355,7 +355,7 @@ const VendorMatching = () => {
                 </div>
 
                 <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="w-4 h-4 text-green-600" />
+                  <IndianRupee className="w-4 h-4 text-green-600" />
                   <span className="font-medium text-green-600">
                     {calculateTotalPrice(vendor?.services) > 0 
                       ? `₹${calculateTotalPrice(vendor?.services).toLocaleString()}` 

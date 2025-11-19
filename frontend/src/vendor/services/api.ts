@@ -533,6 +533,19 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  async getVendorQuoteRequests() {
+    const response = await fetch(`${API_BASE_URL}/quote-requests/`, {
+      headers: this.getAuthHeaders(),
+    });
+    const result = await this.handleResponse(response);
+    if (result.data) {
+      // Backend returns { success: true, quote_requests: [...] }
+      // result.data already contains this structure
+      return result.data;
+    }
+    return { success: false, quote_requests: [], error: result.error };
+  }
+
   async getQuoteRequestDetail(quoteId: number) {
     const response = await fetch(`${API_BASE_URL}/quote-requests/${quoteId}/`, {
       headers: this.getAuthHeaders(),
@@ -546,7 +559,12 @@ class ApiService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(quoteData),
     });
-    return this.handleResponse(response);
+    const result = await this.handleResponse(response);
+    // Backend returns { success: true, message: '...' }
+    if (result.data) {
+      return result.data;
+    }
+    return { success: false, error: result.error };
   }
 }
 

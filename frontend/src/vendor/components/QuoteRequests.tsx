@@ -1,35 +1,26 @@
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
+import { Card, CardContent } from "../../components/ui/card"
 import { Badge } from "../../components/ui/badge"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Textarea } from "../../components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog"
-import { FileText, Clock, Users, MapPin, Calendar, DollarSign, Send } from "lucide-react"
+import { FileText, Clock, Users, MapPin, Calendar, IndianRupee, Send } from "lucide-react"
 import { apiService } from "../services/api"
 
 interface QuoteRequest {
   id: number
   event_name: string
   event_type: string
-  requirement_category: string
-  budget_allocation: number
   vendor_budget?: number
-  vendor_category?: string
   budget_percentage?: number
   event_date: string
   location: string
   guest_count: number
-  attendees: number
   client_name: string
   status: string
-  sent_at: string
   expires_at: string
   has_responded: boolean
-  services?: string[]
-  description?: string
-  urgency?: string
-  created_at?: string
 }
 
 interface QuoteRequestDetail {
@@ -42,19 +33,16 @@ interface QuoteRequestDetail {
     location: string
     attendees: number
     description: string
-    special_requirements: any
   }
   client: {
     name: string
     email: string
     phone: string
   }
-  requirement_category: string
-  budget_allocation: number
   vendor_budget?: number
+  budget_allocation?: number
   vendor_category?: string
   budget_percentage?: number
-  expires_at: string
   has_responded: boolean
 }
 
@@ -66,12 +54,10 @@ export default function QuoteRequests() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
-  // Quote form data
   const [quoteForm, setQuoteForm] = useState({
     quote_amount: '',
     message: '',
     includes: [''],
-    excludes: [''],
     terms: ''
   })
 
@@ -83,8 +69,8 @@ export default function QuoteRequests() {
     try {
       setLoading(true)
       const response = await apiService.getVendorQuoteRequests()
-      if (response.success) {
-        setQuoteRequests(response.quote_requests)
+      if (response.success && response.quote_requests) {
+        setQuoteRequests(Array.isArray(response.quote_requests) ? response.quote_requests : [])
       }
     } catch (error) {
       console.error('Failed to load quote requests:', error)
@@ -96,107 +82,86 @@ export default function QuoteRequests() {
   const loadQuoteDetail = async (quoteId: number) => {
     try {
       const response = await apiService.getQuoteRequestDetail(quoteId)
-      if (response.success) {
+      console.log('Load detail response:', response)
+      if (response.success && response.quote_request) {
         setSelectedRequest(response.quote_request)
         setIsDetailModalOpen(true)
+        return true
+      } else if (response.data) {
+        setSelectedRequest(response.data)
+        setIsDetailModalOpen(true)
+        return true
       }
+      return false
     } catch (error) {
       console.error('Failed to load quote detail:', error)
+      return false
     }
   }
 
   const handleSubmitQuote = async () => {
-    if (!selectedRequest || !quoteForm.quote_amount) return
+    console.log('Submit clicked - selectedRequest:', selectedRequest)
+    console.log('Submit clicked - quoteForm:', quoteForm)
+    
+    const request = selectedRequest?.quote_request || selectedRequest
+    
+    if (!request?.id) {
+      alert('No request selected')
+      return
+    }
+    
+    if (!quoteForm.quote_amount || quoteForm.quote_amount.trim() === '') {
+      alert('Please enter a quote amount')
+      return
+    }
+
+    const amount = parseFloat(quoteForm.quote_amount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Quote amount must be a valid positive number')
+      return
+    }
 
     try {
       setSubmitting(true)
-      
-      const quoteData = {
-        quote_amount: parseFloat(quoteForm.quote_amount),
-        message: quoteForm.message,
+      console.log('Submitting to API with request ID:', request.id)
+      const response = await apiService.submitQuote(request.id, {
+        quote_amount: amount,
+        message: quoteForm.message || '',
         includes: quoteForm.includes.filter(item => item.trim()),
-        excludes: quoteForm.excludes.filter(item => item.trim()),
-        terms: quoteForm.terms
-      }
-
-      const response = await apiService.submitQuote(selectedRequest.id, quoteData)
+        excludes: [],
+        terms: quoteForm.terms || ''
+      })
+      
+      console.log('API response:', response)
       
       if (response.success) {
-        // Refresh quote requests
-        await loadQuoteRequests()
+        alert('Quote submitted successfully!')
         setIsSubmitModalOpen(false)
-        setIsDetailModalOpen(false)
-        
-        // Reset form
-        setQuoteForm({
-          quote_amount: '',
-          message: '',
-          includes: [''],
-          excludes: [''],
-          terms: ''
-        })
+        setSelectedRequest(null)
+        await loadQuoteRequests()
+        setQuoteForm({ quote_amount: '', message: '', includes: [''], terms: '' })
+      } else {
+        alert('Failed to submit quote: ' + (response.error || 'Unknown error'))
+        console.error('Submit failed:', response)
       }
     } catch (error) {
       console.error('Failed to submit quote:', error)
+      alert('Error submitting quote')
     } finally {
       setSubmitting(false)
     }
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount)
+    return '₹' + new Intl.NumberFormat('en-IN').format(amount)
   }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     })
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'sent': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'viewed': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'responded': return 'bg-green-100 text-green-800 border-green-200'
-      case 'expired': return 'bg-red-100 text-red-800 border-red-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const addIncludeItem = () => {
-    setQuoteForm(prev => ({
-      ...prev,
-      includes: [...prev.includes, '']
-    }))
-  }
-
-  const addExcludeItem = () => {
-    setQuoteForm(prev => ({
-      ...prev,
-      excludes: [...prev.excludes, '']
-    }))
-  }
-
-  const updateIncludeItem = (index: number, value: string) => {
-    setQuoteForm(prev => ({
-      ...prev,
-      includes: prev.includes.map((item, i) => i === index ? value : item)
-    }))
-  }
-
-  const updateExcludeItem = (index: number, value: string) => {
-    setQuoteForm(prev => ({
-      ...prev,
-      excludes: prev.excludes.map((item, i) => i === index ? value : item)
-    }))
   }
 
   if (loading) {
@@ -205,7 +170,7 @@ export default function QuoteRequests() {
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            <span className="ml-2">Loading quote requests...</span>
+            <span className="ml-2">Loading...</span>
           </div>
         </CardContent>
       </Card>
@@ -217,92 +182,63 @@ export default function QuoteRequests() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Quote Requests</h2>
-          <p className="text-gray-600">Manage incoming quote requests from customers</p>
+          <p className="text-gray-600">Manage incoming quote requests</p>
         </div>
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-          {quoteRequests.length} requests
-        </Badge>
+        <Badge variant="outline">{quoteRequests.length} requests</Badge>
       </div>
 
       {quoteRequests.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No quote requests</h3>
-            <p className="text-gray-600">
-              You'll receive notifications when customers request quotes for your services.
-            </p>
+            <h3 className="text-lg font-medium mb-2">No quote requests</h3>
+            <p className="text-gray-600">You'll receive notifications when customers request quotes.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
           {quoteRequests.map((request) => (
-            <Card key={request.id} className="hover:shadow-md transition-shadow">
+            <Card key={request.id}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900">
-                          {request.event_name}
-                        </h3>
-                        <p className="text-sm text-gray-600">{request.event_type}</p>
-                      </div>
-                      <Badge className={getStatusColor(request.status)}>
-                        {request.status}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-green-600" />
-                          <div>
-                            <div className="text-lg font-bold text-green-700">{formatCurrency(request.vendor_budget || 0)}</div>
-                            <div className="text-xs text-green-600 font-medium">Your Budget ({request.budget_percentage || 0}%)</div>
-                          </div>
+                    <h3 className="font-semibold text-lg">{request.event_name}</h3>
+                    <p className="text-sm text-gray-600">{request.event_type}</p>
+                    
+                    <div className="grid grid-cols-4 gap-4 mt-4">
+                      <div className="flex items-center gap-2">
+                        <IndianRupee className="h-5 w-5 text-green-600" />
+                        <div>
+                          <div className="font-bold text-green-700">{formatCurrency(request.vendor_budget || 0)}</div>
+                          <div className="text-xs text-gray-500">Your Budget</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-4 w-4" />
                         <span>{formatDate(request.event_date)}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm">
                         <Users className="h-4 w-4" />
                         <span>{request.guest_count} guests</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm">
                         <MapPin className="h-4 w-4" />
                         <span>{request.location}</span>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>Expires {formatDate(request.expires_at)}</span>
-                      </div>
-                      <div>Client: {request.client_name}</div>
-                    </div>
                   </div>
 
                   <div className="flex flex-col gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadQuoteDetail(request.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => loadQuoteDetail(request.id)}>
                       View Details
                     </Button>
                     {!request.has_responded && (
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => {
-                          loadQuoteDetail(request.id)
-                          setIsSubmitModalOpen(true)
-                        }}
-                      >
+                      <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
+                        const loaded = await loadQuoteDetail(request.id)
+                        if (loaded) {
+                          setTimeout(() => setIsSubmitModalOpen(true), 200)
+                        }
+                      }}>
                         <Send className="h-4 w-4 mr-1" />
                         Submit Quote
                       </Button>
@@ -315,335 +251,172 @@ export default function QuoteRequests() {
         </div>
       )}
 
-      {/* Quote Detail Modal */}
-      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          {selectedRequest && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selectedRequest.event.name} - Quote Request</DialogTitle>
-              </DialogHeader>
-
-              <div className="space-y-6">
-                {/* Category-Specific Notice */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-500 p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="text-2xl">🎯</div>
-                    <div>
-                      <p className="text-sm font-semibold text-green-900 mb-1">
-                        Targeted Quote Request - Perfect Match for You!
-                      </p>
-                      <p className="text-xs text-green-700">
-                        This customer specifically needs your category of services. You don't need to worry about other services like venues, photography, etc.
-                      </p>
-                    </div>
+      {/* Detail Modal */}
+      {selectedRequest && (
+        <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{selectedRequest.event?.name} - Quote Request</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium mb-2">Event Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <div><strong>Type:</strong> {selectedRequest.event?.type}</div>
+                    <div><strong>Date:</strong> {selectedRequest.event?.date ? formatDate(selectedRequest.event.date) : 'N/A'}</div>
+                    <div><strong>Location:</strong> {selectedRequest.event?.location}</div>
+                    <div><strong>Attendees:</strong> {selectedRequest.event?.attendees}</div>
                   </div>
                 </div>
-
-                {/* Event Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Event Details</h4>
-                    <div className="space-y-1 text-sm">
-                      <div><strong>Type:</strong> {selectedRequest.event.type}</div>
-                      <div><strong>Date:</strong> {formatDate(selectedRequest.event.date)}</div>
-                      <div><strong>Duration:</strong> {selectedRequest.event.duration} hours</div>
-                      <div><strong>Location:</strong> {selectedRequest.event.location}</div>
-                      <div><strong>Attendees:</strong> {selectedRequest.event.attendees}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Client Details</h4>
-                    <div className="space-y-1 text-sm">
-                      <div><strong>Name:</strong> {selectedRequest.client.name}</div>
-                      <div><strong>Email:</strong> {selectedRequest.client.email}</div>
-                      <div><strong>Phone:</strong> {selectedRequest.client.phone}</div>
-                    </div>
+                <div>
+                  <h4 className="font-medium mb-2">Client Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <div><strong>Name:</strong> {selectedRequest.client?.name}</div>
+                    <div><strong>Email:</strong> {selectedRequest.client?.email}</div>
+                    <div><strong>Phone:</strong> {selectedRequest.client?.phone}</div>
                   </div>
                 </div>
-
-                {/* Budget & Category */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 p-5 rounded-xl shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-2xl">💰</span>
-                        <h4 className="font-bold text-green-900 text-lg">Your Allocated Budget</h4>
-                      </div>
-                      <p className="text-sm text-green-700 font-medium mb-1">
-                        Specifically for {selectedRequest.vendor_category || selectedRequest.requirement_category} services only
-                      </p>
-                      <p className="text-xs text-green-600">
-                        This is {selectedRequest.budget_percentage || 0}% of the total event budget, allocated just for your services
-                      </p>
-                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                        💡 <strong>Tip:</strong> Quote competitively within this range for the best chance of acceptance!
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-green-900">
-                        {formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation)}
-                      </div>
-                      <div className="text-xs text-green-600 mt-1">
-                        {selectedRequest.budget_percentage || 0}% of total
-                      </div>
-                    </div>
-                  </div>
+              </div>
+              
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="font-bold text-green-900 mb-2">Your Allocated Budget</h4>
+                <div className="text-3xl font-bold text-green-900">
+                  {formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation || 0)}
                 </div>
+                <p className="text-sm text-green-700 mt-1">
+                  {selectedRequest.budget_percentage || 0}% of total event budget
+                </p>
+              </div>
 
-                {/* Description */}
-                {selectedRequest.event.description && (
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Event Description</h4>
-                    <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                      {selectedRequest.event.description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsDetailModalOpen(false)}
-                    className="flex-1"
-                  >
-                    Close
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" onClick={() => setIsDetailModalOpen(false)} className="flex-1">
+                  Close
+                </Button>
+                {!selectedRequest.has_responded && (
+                  <Button onClick={() => {
+                    setIsDetailModalOpen(false)
+                    setTimeout(() => setIsSubmitModalOpen(true), 100)
+                  }} className="flex-1 bg-green-600 hover:bg-green-700">
+                    Submit Quote
                   </Button>
-                  {!selectedRequest.has_responded && (
-                    <Button
-                      onClick={() => setIsSubmitModalOpen(true)}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                    >
-                      Submit Quote
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Submit Quote Modal - Enhanced UI */}
-      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 -m-6 mb-6 rounded-t-lg">
-            <DialogTitle className="text-xl font-semibold">Submit Your Quote</DialogTitle>
-            <p className="text-green-100 text-sm mt-1">
-              Provide a detailed quote for {selectedRequest?.event.name}
-            </p>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Event Summary Card */}
-            {selectedRequest && (
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border-2 border-green-200">
-                <h4 className="font-medium text-gray-900 mb-2">📋 Your Quote Summary</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      {/* Submit Modal */}
+      {selectedRequest && (
+        <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
+          <DialogContent className="max-w-2xl bg-white">
+            <DialogHeader>
+              <DialogTitle className="text-gray-900">Submit Quote</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Your Budget:</span>
+                    <span className="text-gray-600">Event:</span>
+                    <div className="font-medium">{(selectedRequest?.quote_request || selectedRequest)?.event?.name}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Budget:</span>
                     <div className="font-semibold text-green-600">
-                      {formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      ({selectedRequest.budget_percentage || 0}% of total)
+                      {formatCurrency((selectedRequest?.quote_request || selectedRequest)?.vendor_budget || (selectedRequest?.quote_request || selectedRequest)?.budget_allocation || 0)}
                     </div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Event Date:</span>
-                    <div className="font-medium">{formatDate(selectedRequest.event.date)}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Guest Count:</span>
-                    <div className="font-medium">{selectedRequest.event.attendees}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Your Service:</span>
-                    <div className="font-medium text-blue-600">{selectedRequest.vendor_category || selectedRequest.requirement_category}</div>
-                  </div>
-                </div>
-                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                  💡 <strong>Note:</strong> Quote only for {selectedRequest.vendor_category || selectedRequest.requirement_category} services. Other services handled by other vendors.
                 </div>
               </div>
-            )}
 
-            {/* Quote Amount - Enhanced */}
-            <div className="bg-white border-2 border-green-200 rounded-lg p-4">
-              <label className="block text-lg font-semibold text-gray-900 mb-3">
-                💰 Your {selectedRequest?.vendor_category || selectedRequest?.requirement_category} Quote Amount *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">₹</span>
-                <Input
-                  type="number"
-                  value={quoteForm.quote_amount}
-                  onChange={(e) => setQuoteForm(prev => ({ ...prev, quote_amount: e.target.value }))}
-                  placeholder="Enter your quote amount"
-                  className="pl-8 text-lg font-semibold h-12 border-green-300 focus:border-green-500"
-                  required
+              <div>
+                <label className="block font-medium mb-2">Your Quote Amount *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-gray-500">₹</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={quoteForm.quote_amount}
+                    onChange={(e) => setQuoteForm(prev => ({ ...prev, quote_amount: e.target.value }))}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    placeholder="Enter amount"
+                    className="pl-8 h-12 text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Customer budget: {formatCurrency((selectedRequest?.quote_request || selectedRequest)?.vendor_budget || (selectedRequest?.quote_request || selectedRequest)?.budget_allocation || 0)}
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-2">Message</label>
+                <Textarea
+                  value={quoteForm.message}
+                  onChange={(e) => setQuoteForm(prev => ({ ...prev, message: e.target.value }))}
+                  placeholder="Describe your services..."
+                  rows={3}
                 />
               </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Enter your quote for <strong>{selectedRequest?.vendor_category || selectedRequest?.requirement_category}</strong> services only
-              </p>
-              <p className="text-xs text-green-600 mt-1 font-medium">
-                💡 Allocated Budget: {selectedRequest ? formatCurrency(selectedRequest.vendor_budget || selectedRequest.budget_allocation) : ''} ({selectedRequest?.budget_percentage || 0}% of total)
-              </p>
-            </div>
 
-            {/* Message - Enhanced */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <label className="block text-lg font-semibold text-gray-900 mb-3">
-                💬 Personal Message
-              </label>
-              <Textarea
-                value={quoteForm.message}
-                onChange={(e) => setQuoteForm(prev => ({ ...prev, message: e.target.value }))}
-                placeholder="Hi! I'm excited to work on your event. Here's what I can offer..."
-                rows={4}
-                className="border-blue-300 focus:border-blue-500"
-              />
-              <p className="text-sm text-blue-600 mt-2">
-                Add a personal touch to connect with the client
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* What's Included - Enhanced */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <label className="block text-lg font-semibold text-gray-900 mb-3">
-                  ✅ What's Included
-                </label>
+              <div>
+                <label className="block font-medium mb-2">Services Included</label>
                 <div className="space-y-2">
                   {quoteForm.includes.map((item, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={item}
-                        onChange={(e) => updateIncludeItem(index, e.target.value)}
-                        placeholder="e.g., Professional equipment, Setup & breakdown"
-                        className="border-green-300 focus:border-green-500"
-                      />
-                      {quoteForm.includes.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setQuoteForm(prev => ({
-                            ...prev,
-                            includes: prev.includes.filter((_, i) => i !== index)
-                          }))}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ✕
-                        </Button>
-                      )}
-                    </div>
+                    <Input
+                      key={index}
+                      value={item}
+                      onChange={(e) => setQuoteForm(prev => ({
+                        ...prev,
+                        includes: prev.includes.map((i, idx) => idx === index ? e.target.value : i)
+                      }))}
+                      placeholder="e.g., Equipment, Setup"
+                    />
                   ))}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={addIncludeItem}
-                    className="w-full border-green-300 text-green-700 hover:bg-green-100"
+                    onClick={() => setQuoteForm(prev => ({ ...prev, includes: [...prev.includes, ''] }))}
+                    className="w-full"
                   >
-                    + Add Service
+                    + Add Item
                   </Button>
                 </div>
               </div>
 
-              {/* What's Not Included - Enhanced */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <label className="block text-lg font-semibold text-gray-900 mb-3">
-                  ❌ What's Not Included
-                </label>
-                <div className="space-y-2">
-                  {quoteForm.excludes.map((item, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={item}
-                        onChange={(e) => updateExcludeItem(index, e.target.value)}
-                        placeholder="e.g., Travel expenses, Additional hours"
-                        className="border-orange-300 focus:border-orange-500"
-                      />
-                      {quoteForm.excludes.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setQuoteForm(prev => ({
-                            ...prev,
-                            excludes: prev.excludes.filter((_, i) => i !== index)
-                          }))}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ✕
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addExcludeItem}
-                    className="w-full border-orange-300 text-orange-700 hover:bg-orange-100"
-                  >
-                    + Add Exclusion
-                  </Button>
-                </div>
+              <div>
+                <label className="block font-medium mb-2">Terms</label>
+                <Textarea
+                  value={quoteForm.terms}
+                  onChange={(e) => setQuoteForm(prev => ({ ...prev, terms: e.target.value }))}
+                  placeholder="Payment terms, cancellation policy..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1" disabled={submitting}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmitQuote} disabled={submitting || !quoteForm.quote_amount} className="flex-1 bg-green-600 hover:bg-green-700">
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit Quote
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-
-            {/* Terms - Enhanced */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <label className="block text-lg font-semibold text-gray-900 mb-3">
-                📋 Terms & Conditions
-              </label>
-              <Textarea
-                value={quoteForm.terms}
-                onChange={(e) => setQuoteForm(prev => ({ ...prev, terms: e.target.value }))}
-                placeholder="• 50% advance payment required\n• Final payment due on event day\n• Cancellation 48 hours prior for full refund\n• Additional hours charged at ₹X per hour"
-                rows={4}
-                className="border-purple-300 focus:border-purple-500"
-              />
-              <p className="text-sm text-purple-600 mt-2">
-                Clear terms help avoid misunderstandings later
-              </p>
-            </div>
-
-            {/* Actions - Enhanced */}
-            <div className="flex gap-3 pt-6 border-t-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsSubmitModalOpen(false)}
-                className="flex-1 h-12 text-lg"
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmitQuote}
-                disabled={submitting || !quoteForm.quote_amount}
-                className="flex-1 h-12 text-lg bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-semibold"
-              >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-5 w-5 mr-2" />
-                    Submit Quote
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

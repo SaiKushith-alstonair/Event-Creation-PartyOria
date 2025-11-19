@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, MapPin, Users, DollarSign, FileText, Send, CheckCircle, Building2 } from "lucide-react"
+import { Calendar, MapPin, Users, IndianRupee, FileText, Send, CheckCircle, Building2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface QuoteRequestModalProps {

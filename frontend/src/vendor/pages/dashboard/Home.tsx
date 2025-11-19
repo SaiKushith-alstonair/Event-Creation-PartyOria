@@ -1,10 +1,9 @@
-import { DollarSign, Calendar, TrendingUp, Bell, Plus, Clock, MessageSquare, Star, CheckCircle, AlertTriangle, ShieldAlert, X, BookOpen, FileText } from "lucide-react";
+import { IndianRupee, Calendar, TrendingUp, Bell, Plus, Clock, MessageSquare, Star, CheckCircle, AlertTriangle, ShieldAlert, X, BookOpen, FileText } from "lucide-react";
 import { NotificationBell } from "../../../components/NotificationBell";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import QuoteRequests from "../../components/QuoteRequests";
-import VendorQuoteManager from "../../components/VendorQuoteManager";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +17,7 @@ const getStatsCards = (stats: any) => [
     title: "Total Revenue",
     value: `₹${stats?.total_revenue || 0}`,
     change: "+12.5%",
-    icon: DollarSign,
+    icon: IndianRupee,
     gradient: "from-primary to-accent",
   },
   {
@@ -639,7 +638,7 @@ const Home = () => {
               </Button>
             </div>
             <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
-              <VendorQuoteManager />
+              <QuoteRequests />
             </div>
           </div>
         </div>

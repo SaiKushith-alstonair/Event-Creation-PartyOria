@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Calendar, DollarSign, MapPin, Clock, User, Phone } from 'lucide-react';
+import { Calendar, IndianRupee, MapPin, Clock, User, Phone } from 'lucide-react';
 
 interface ConversationContext {
   event_id?: number;
@@ -76,7 +76,7 @@ export const ConversationContextPanel: React.FC<ConversationContextPanelProps> =
               
               {context.event_budget && (
                 <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="h-4 w-4 text-gray-500" />
+                  <IndianRupee className="h-4 w-4 text-gray-500" />
                   <span>${context.event_budget.toLocaleString()}</span>
                 </div>
               )}

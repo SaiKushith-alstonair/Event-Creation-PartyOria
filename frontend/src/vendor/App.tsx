@@ -18,7 +18,7 @@ import Settings from "./pages/dashboard/Settings";
 import Services from "./pages/dashboard/Services";
 import VendorManagement from "./pages/dashboard/VendorManagement";
 import VendorChat from "./pages/dashboard/VendorChat";
-import VendorQuoteManager from "./components/VendorQuoteManager";
+import QuoteRequests from "./components/QuoteRequests";
 
 const VendorApp = () => (
   <TooltipProvider>
@@ -37,7 +37,7 @@ const VendorApp = () => (
         <Route path="verification" element={<Verification />} />
         <Route path="settings" element={<Settings />} />
         <Route path="services" element={<Services />} />
-        <Route path="quotes" element={<VendorQuoteManager />} />
+        <Route path="quotes" element={<QuoteRequests />} />
         <Route path="messages" element={<VendorChat />} />
       </Route>
       <Route path="*" element={<NotFound />} />

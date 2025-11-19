@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, MapPin, Users, DollarSign, Edit, User, Briefcase } from 'lucide-react';
+import { X, Calendar, MapPin, Users, IndianRupee, Edit, User, Briefcase } from 'lucide-react';
 import { apiService, ApiEvent, ApiVendor } from '../services/api';
 
 interface EventDetailsModalProps {
@@ -126,7 +126,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     <span>{event.form_data?.attendees || 0} attendees</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <DollarSign className="text-purple-600" size={20} />
+                    <IndianRupee className="text-purple-600" size={20} />
                     <span>₹{event.form_data?.budget?.toLocaleString() || '0'}</span>
                   </div>
                 </div>

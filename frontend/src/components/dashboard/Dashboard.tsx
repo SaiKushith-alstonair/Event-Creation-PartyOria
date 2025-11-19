@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { CalendarIcon, Clock, Search, TrendingUp, Zap, CheckCircle, DollarSign, Eye, Users, Calendar, FileText, UserCheck, Bell } from "lucide-react"
+import { CalendarIcon, Clock, Search, TrendingUp, Zap, CheckCircle, IndianRupee, Eye, Users, Calendar, FileText, UserCheck, Bell } from "lucide-react"
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -176,7 +176,7 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
     {
       title: "Total Budget",
       value: totalSpentAmount > 0 ? `₹${Math.round(totalSpentAmount / 1000)}K` : "₹0",
-      icon: <DollarSign className="h-6 w-6 text-green-600" />,
+      icon: <IndianRupee className="h-6 w-6 text-green-600" />,
       change: "",
       description: "Budget allocated"
     },
@@ -268,7 +268,7 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
             className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
             onClick={() => onNavigate?.('budget-analytics')}
           >
-            <DollarSign className="mr-2 h-4 w-4" /> Budget Analytics
+            <IndianRupee className="mr-2 h-4 w-4" /> Budget Analytics
           </Button>
           <Button 
             className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center h-12"
@@ -359,7 +359,7 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
                     activity.type === 'event' ? 'bg-purple-600' :
                     'bg-gradient-to-r from-purple-600 to-pink-600'
                   }`}>
-                    {activity.type === 'payment' && <DollarSign className="text-white h-3 w-3" />}
+                    {activity.type === 'payment' && <IndianRupee className="text-white h-3 w-3" />}
                     {activity.type === 'event' && <Calendar className="text-white h-3 w-3" />}
                     {activity.type !== 'payment' && activity.type !== 'event' && <CheckCircle className="text-white h-3 w-3" />}
                   </div>
