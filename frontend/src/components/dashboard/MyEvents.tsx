@@ -52,11 +52,9 @@ export default function MyEvents() {
       try {
         await apiService.deleteEvent(parseInt(eventId));
         await loadEvents();
-        alert('Event deleted successfully!');
       } catch (error) {
         console.error('Error deleting event:', error);
         await loadEvents();
-        alert('Failed to delete event. It may not exist or you may not have permission.');
       }
     }
   };

@@ -265,6 +265,7 @@ class Event(models.Model):
     created_by = models.CharField(
         max_length=255, 
         blank=True,
+        default='',
         help_text="Name or identifier of event creator"
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -328,6 +329,8 @@ class QuoteRequest(models.Model):
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('vendors_notified', 'Vendors Notified'),
+        ('responses_received', 'Responses Received'),
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
@@ -351,7 +354,7 @@ class QuoteRequest(models.Model):
     is_targeted_quote = models.BooleanField(default=False)
     prefilled_event_id = models.PositiveIntegerField(null=True, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
-    source_event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True)
+    source_event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)
     selected_vendors = models.JSONField(default=list)
     selected_venues = models.JSONField(default=list)
     category_specific_data = models.JSONField(default=dict)
@@ -412,30 +415,4 @@ class RSVP(models.Model):
     def __str__(self):
         return f"RSVP for {self.event.event_name}"
 
-class VendorQuote(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('submitted', 'Submitted'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Rejected'),
-    ]
-    
-    quote_request = models.OneToOneField(QuoteRequest, on_delete=models.CASCADE, related_name='vendor_quote')
-    quote_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    message = models.TextField(blank=True)
-    includes = models.JSONField(default=list, help_text="What's included in this quote")
-    excludes = models.JSONField(default=list, help_text="What's not included")
-    terms = models.TextField(blank=True, help_text="Terms and conditions")
-    valid_until = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    responded_at = models.DateTimeField(null=True, blank=True)
-    
-    class Meta:
-        db_table = 'vendor_quotes'
-        indexes = [
-            models.Index(fields=['status']),
-        ]
-    
-    def __str__(self):
-        return f"Quote ${self.quote_amount} for {self.quote_request.event_name}"
+

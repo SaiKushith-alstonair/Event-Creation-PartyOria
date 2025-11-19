@@ -95,11 +95,11 @@ export const Chat: React.FC = () => {
 
   // Join conversation when selected
   useEffect(() => {
-    if (selectedConversation) {
+    if (selectedConversation && selectedConversation.id) {
       joinConversation(selectedConversation.id);
       loadConversationMessages(selectedConversation.id);
     }
-  }, [selectedConversation]);
+  }, [selectedConversation?.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,18 +107,24 @@ export const Chat: React.FC = () => {
 
   const loadAvailableUsers = async () => {
     try {
-      // Get token without refresh to avoid 401 errors
-      let token = localStorage.getItem('access_token') || 
-                  localStorage.getItem('authToken') || 
-                  localStorage.getItem('token');
+      // Get token from Zustand first
+      const authStorage = localStorage.getItem('auth-storage');
+      let token = null;
       
-      // Check vendor profile for vendor tokens
-      const vendorProfile = localStorage.getItem('vendor_profile');
-      if (vendorProfile && !token) {
-        const vendorData = JSON.parse(vendorProfile);
-        if (vendorData.access_token) {
-          token = vendorData.access_token;
+      if (authStorage) {
+        try {
+          const parsed = JSON.parse(authStorage);
+          token = parsed?.state?.tokens?.access;
+        } catch (e) {
+          console.error('Failed to parse auth-storage:', e);
         }
+      }
+      
+      // Fallback to direct localStorage
+      if (!token) {
+        token = localStorage.getItem('access_token') || 
+                localStorage.getItem('authToken') || 
+                localStorage.getItem('token');
       }
       
       if (!token) return;
@@ -454,12 +460,17 @@ export const Chat: React.FC = () => {
                 <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
                   Start New Conversation
                 </div>
-                {availableUsers.map(user => (
-                  <div
-                    key={user.id}
-                    className="p-4 cursor-pointer hover:bg-muted border-b"
-                    onClick={() => handleStartConversation(user)}
-                  >
+                {availableUsers.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    <p>No users available</p>
+                  </div>
+                ) : (
+                  availableUsers.map(user => (
+                    <div
+                      key={`user-${user.id}`}
+                      className="p-4 cursor-pointer hover:bg-muted border-b"
+                      onClick={() => handleStartConversation(user)}
+                    >
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={user.profile_picture} />
@@ -473,7 +484,8 @@ export const Chat: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             ) : (
               <div className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -488,7 +500,7 @@ export const Chat: React.FC = () => {
                     const otherUser = getOtherUser(conversation);
                     return (
                       <div
-                        key={conversation.id}
+                        key={`conv-${conversation.id}`}
                         className={`p-4 cursor-pointer transition-colors border-b hover:bg-muted ${
                           selectedConversation?.id === conversation.id ? 'bg-muted' : ''
                         }`}

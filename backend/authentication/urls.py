@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework_simplejwt.views import TokenRefreshView
 
 # Authentication endpoints without CSRF protection
 urlpatterns = [
@@ -13,6 +14,6 @@ urlpatterns = [
     path('profile/', views.get_user_profile, name='profile'),
     path('sessions/', views.get_user_sessions, name='sessions'),
     
-    # JWT token refresh (CSRF exempt)
-    path('token/refresh/', csrf_exempt(views.refresh_token), name='token_refresh'),
+    # JWT token refresh with blacklist support
+    path('token/refresh/', csrf_exempt(TokenRefreshView.as_view()), name='token_refresh'),
 ]

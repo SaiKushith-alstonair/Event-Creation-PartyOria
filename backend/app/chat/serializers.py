@@ -10,16 +10,23 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'user_type', 'profile_picture', 'display_name']
     
     def get_display_name(self, obj):
-        # If this is a bridged vendor user, get name from VendorAuth
-        try:
-            if hasattr(obj, 'vendor_auth') and obj.vendor_auth:
-                return obj.vendor_auth.full_name
-        except (AttributeError, Exception):
-            pass
+        # For vendors, use full_name from CustomUser
+        if obj.user_type == 'vendor':
+            full_name = f"{obj.first_name} {obj.last_name}".strip()
+            if full_name:
+                return full_name
         
-        # For regular users, return username or email (but avoid auto-generated vendor usernames)
+        # For customers, use username or full name
+        if obj.first_name or obj.last_name:
+            full_name = f"{obj.first_name} {obj.last_name}".strip()
+            if full_name:
+                return full_name
+        
+        # Fallback to username if not email-like
         if obj.username and obj.username != obj.email and not obj.username.startswith('vendor_'):
             return obj.username
+        
+        # Last resort: email
         return obj.email
 
 class MessageAttachmentSerializer(serializers.ModelSerializer):

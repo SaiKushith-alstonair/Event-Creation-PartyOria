@@ -48,15 +48,15 @@ class EventType(models.Model):
         return f"{self.category.name} - {self.name}"
 
 class VendorService(models.Model):
-    service_name = models.CharField(max_length=200)
-    category = models.CharField(max_length=100)
-    service_price = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.TextField()
+    service_name = models.CharField(max_length=200, default='Service')
+    category = models.CharField(max_length=100, default='general')
+    service_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(default='')
     image = models.CharField(max_length=255, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    user = models.ForeignKey('VendorAuth', on_delete=models.CASCADE, related_name='vendor_services', db_column='user_id', null=True, blank=True)
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name='vendor_services', db_column='user_id', null=True, blank=True)
     maximum_people = models.IntegerField(null=True, blank=True)
     minimum_people = models.IntegerField(null=True, blank=True)
 
@@ -97,7 +97,7 @@ class SpecialRequirement(models.Model):
         return f"{self.event_type.name} - {self.requirement_label}"
 
 class VendorProfile(models.Model):
-    user = models.OneToOneField('VendorAuth', on_delete=models.CASCADE, related_name='vendor_profile', db_column='user_id', null=True, blank=True)
+    user = models.OneToOneField('authentication.CustomUser', on_delete=models.CASCADE, related_name='vendor_profile', db_column='user_id', null=True)
     profile_data = models.JSONField(default=dict)
     profile_image = models.ImageField(upload_to='vendor_profiles/', blank=True, null=True)
     is_completed = models.BooleanField(default=False)
@@ -110,55 +110,5 @@ class VendorProfile(models.Model):
     def __str__(self):
         return f"Profile for {self.user.email if self.user else 'Unknown'}"
 
-class VendorAuth(models.Model):
-    email = models.EmailField(unique=True)
-    password = models.CharField(max_length=128)
-    full_name = models.CharField(max_length=255)
-    mobile = models.CharField(max_length=15)
-    business = models.CharField(max_length=100)
-    experience_level = models.CharField(max_length=50, default='Intermediate')
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    pincode = models.CharField(max_length=10)
-    location = models.CharField(max_length=255)
-    services = models.JSONField(default=list)
-    profile_image = models.ImageField(upload_to='vendor_profiles/', blank=True, null=True)
-    is_verified = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    onboarding_completed = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    # Bridge to CustomUser for chat system
-    chat_user = models.OneToOneField('authentication.CustomUser', on_delete=models.CASCADE, null=True, blank=True, related_name='vendor_auth')
-    
-    class Meta:
-        db_table = 'vendor_auth'
-    
-    def set_password(self, raw_password):
-        self.password = make_password(raw_password)
-    
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.password)
-    
-    def get_or_create_chat_user(self):
-        """Get or create corresponding CustomUser for chat system"""
-        if not self.chat_user:
-            from authentication.models import CustomUser
-            # Create CustomUser with vendor data
-            chat_user = CustomUser.objects.create(
-                username=f"vendor_{self.id}_{self.email}",
-                email=self.email,
-                user_type='vendor',
-                phone=self.mobile,
-                is_verified=self.is_verified
-            )
-            chat_user.set_unusable_password()  # No password login for bridge user
-            chat_user.save()
-            self.chat_user = chat_user
-            self.save()
-        return self.chat_user
-    
-    def __str__(self):
-        return f"{self.full_name} ({self.email})"
+
 

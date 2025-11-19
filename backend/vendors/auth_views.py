@@ -9,7 +9,7 @@ from django.utils.decorators import method_decorator
 from authentication.models import CustomUser
 from authentication.serializers import UserSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import VendorAuth
+from .models import VendorProfile
 import jwt
 from django.conf import settings
 
@@ -18,82 +18,61 @@ class VendorRegisterView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        """Register a new vendor using VendorAuth model"""
+        """Register a new vendor using CustomUser"""
         try:
             data = request.data
-            print(f"Vendor registration data: {data}")
             
-            # Check if email already exists
-            if VendorAuth.objects.filter(email=data['email']).exists():
+            if CustomUser.objects.filter(email=data['email']).exists():
                 return Response({'error': 'Email already exists'}, status=400)
             
-            # Create vendor with minimal data - rest comes from onboarding
-            vendor = VendorAuth.objects.create(
+            user = CustomUser.objects.create_user(
+                username=data['email'],
                 email=data['email'],
-                full_name=data['full_name'],
-                mobile=data.get('mobile', ''),
+                password=data['password'],
+                first_name=data.get('full_name', '').split()[0] if data.get('full_name') else '',
+                last_name=' '.join(data.get('full_name', '').split()[1:]) if len(data.get('full_name', '').split()) > 1 else '',
+                user_type='vendor',
+                phone=data.get('mobile', ''),
                 business=data.get('business', ''),
                 experience_level=data.get('experience_level', ''),
                 city=data.get('city', ''),
                 state=data.get('state', ''),
                 pincode=data.get('pincode', ''),
                 location=data.get('location', ''),
-                services=data.get('services', []),
-                onboarding_completed=False  # New vendors need onboarding
+                onboarding_completed=False
             )
-            vendor.set_password(data['password'])
-            vendor.save()
-            print(f"Vendor created successfully: {vendor.id}")
             
-            # Generate JWT tokens using DRF SimpleJWT format
-            from rest_framework_simplejwt.tokens import RefreshToken
-            from authentication.models import CustomUser
-            
-            # Create corresponding CustomUser for JWT compatibility
-            user, created = CustomUser.objects.get_or_create(
-                email=vendor.email,
-                user_type='vendor',
-                defaults={
-                    'username': vendor.email,
-                    'password': None
-                }
+            VendorProfile.objects.create(
+                user=user,
+                profile_data={'services': data.get('services', [])},
+                is_completed=False
             )
             
             refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
-            
-            # Create chat user for new vendor
-            chat_user = vendor.get_or_create_chat_user()
             
             return Response({
                 'message': 'Vendor registered successfully',
                 'vendor': {
-                    'id': vendor.id,
-                    'email': vendor.email,
-                    'full_name': vendor.full_name,
-                    'mobile': vendor.mobile,
-                    'business': vendor.business,
-                    'experience_level': vendor.experience_level,
-                    'city': vendor.city,
-                    'state': vendor.state,
-                    'pincode': vendor.pincode,
-                    'location': vendor.location,
-                    'services': vendor.services,
-                    'is_verified': vendor.is_verified,
-                    'onboarding_completed': vendor.onboarding_completed,
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': f"{user.first_name} {user.last_name}".strip(),
+                    'mobile': user.phone,
+                    'business': user.business,
+                    'experience_level': user.experience_level,
+                    'city': user.city,
+                    'state': user.state,
+                    'pincode': user.pincode,
+                    'location': user.location,
+                    'is_verified': user.is_verified,
+                    'onboarding_completed': user.onboarding_completed,
                     'user_type': 'vendor',
-                    'chat_user_id': chat_user.id,
-                    'access_token': access_token
+                    'access_token': str(refresh.access_token)
                 },
-                'access': access_token,
-                'refresh': refresh_token
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            print(f"Vendor registration error: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Keep function-based view as backup
@@ -139,80 +118,78 @@ class VendorLoginView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        """Vendor login using VendorAuth model"""
+        """Vendor login using CustomUser"""
         try:
-            print(f"Login attempt - Request data: {request.data}")
             email = request.data.get('email') or request.data.get('username')
             password = request.data.get('password')
-            print(f"Login attempt - Email: {email}, Password provided: {bool(password)}")
             
             if not email or not password:
-                print("Login failed - Missing email or password")
                 return Response({'non_field_errors': ['Email and password are required']}, status=400)
             
-            try:
-                print(f"Looking for vendor with email: {email}")
-                vendor = VendorAuth.objects.get(email=email)
-                print(f"Found vendor: {vendor.full_name}")
-                print(f"Checking password...")
-                if vendor.check_password(password):
-                    print("Password check passed")
-                    # Generate JWT tokens using DRF SimpleJWT format
-                    from rest_framework_simplejwt.tokens import RefreshToken
-                    from authentication.models import CustomUser
-                    
-                    # Create or get corresponding CustomUser for JWT compatibility
-                    user, created = CustomUser.objects.get_or_create(
-                        email=vendor.email,
-                        user_type='vendor',
-                        defaults={
-                            'username': vendor.email,
-                            'password': None
-                        }
-                    )
-                    
-                    refresh = RefreshToken.for_user(user)
-                    access_token = str(refresh.access_token)
-                    refresh_token = str(refresh)
-                    
-                    # Ensure chat user exists for this vendor
-                    chat_user = vendor.get_or_create_chat_user()
-                    
-                    return Response({
-                        'message': 'Login successful',
-                        'vendor': {
-                            'id': vendor.id,
-                            'email': vendor.email,
-                            'full_name': vendor.full_name,
-                            'mobile': vendor.mobile,
-                            'business': vendor.business,
-                            'experience_level': vendor.experience_level,
-                            'city': vendor.city,
-                            'state': vendor.state,
-                            'pincode': vendor.pincode,
-                            'location': vendor.location,
-                            'services': vendor.services,
-                            'is_verified': vendor.is_verified,
-                            'onboarding_completed': vendor.onboarding_completed,
-                            'user_type': 'vendor',
-                            'chat_user_id': chat_user.id,
-                            'access_token': access_token  # Store for chat system
-                        },
-                        'access': access_token,
-                        'refresh': refresh_token
-                    }, status=200)
-                else:
-                    print("Password check failed")
-                    return Response({'non_field_errors': ['Invalid credentials']}, status=400)
-            except VendorAuth.DoesNotExist:
-                print(f"Vendor not found with email: {email}")
+            user = authenticate(username=email, password=password)
+            
+            if not user:
+                try:
+                    user_obj = CustomUser.objects.filter(email=email, user_type='vendor').first()
+                    if user_obj:
+                        user = authenticate(username=user_obj.username, password=password)
+                except Exception:
+                    pass
+            
+            if not user or user.user_type != 'vendor':
                 return Response({'non_field_errors': ['Invalid credentials']}, status=400)
             
+            login(request, user)
+            refresh = RefreshToken.for_user(user)
+            
+            profile = VendorProfile.objects.filter(user=user).first()
+            services = profile.profile_data.get('services', []) if profile else []
+            
+            return Response({
+                'message': 'Login successful',
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': f"{user.first_name} {user.last_name}".strip(),
+                    'mobile': user.phone,
+                    'business': user.business,
+                    'experience_level': user.experience_level,
+                    'city': user.city,
+                    'state': user.state,
+                    'pincode': user.pincode,
+                    'location': user.location,
+                    'services': services,
+                    'is_verified': user.is_verified,
+                    'onboarding_completed': user.onboarding_completed,
+                    'user_type': 'vendor',
+                    'access_token': str(refresh.access_token)
+                },
+                'vendor': {
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': f"{user.first_name} {user.last_name}".strip(),
+                    'mobile': user.phone,
+                    'business': user.business,
+                    'experience_level': user.experience_level,
+                    'city': user.city,
+                    'state': user.state,
+                    'pincode': user.pincode,
+                    'location': user.location,
+                    'services': services,
+                    'is_verified': user.is_verified,
+                    'onboarding_completed': user.onboarding_completed,
+                    'user_type': 'vendor',
+                    'access_token': str(refresh.access_token)
+                },
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            }, status=200)
+            
         except Exception as e:
-            print(f"Login exception: {str(e)}")
             import traceback
-            traceback.print_exc()
-            return Response({'error': 'Login failed'}, status=500)
+            print(f"Vendor login error: {str(e)}")
+            print(traceback.format_exc())
+            return Response({'error': str(e)}, status=500)
 
 # Keep function-based view as backup
 @csrf_exempt
@@ -263,79 +240,78 @@ def vendor_login(request):
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def vendor_profile(request):
-    """Get or update vendor profile using DRF authentication"""
+    """Get or update vendor profile"""
     try:
-        print(f"Profile request - User: {request.user.email}, Type: {request.user.user_type}")
-        
         if request.user.user_type != 'vendor':
             return Response({'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
         
-        # Get vendor from VendorAuth table
-        try:
-            vendor = VendorAuth.objects.get(email=request.user.email)
-        except VendorAuth.DoesNotExist:
-            return Response({'error': 'Vendor profile not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Get or create vendor profile
-        from .models import VendorProfile
+        user = request.user
         profile, created = VendorProfile.objects.get_or_create(
-            user=vendor,
+            user=user,
             defaults={'profile_data': {}}
         )
         
         if request.method == 'GET':
             return Response({
-                'id': vendor.id,
-                'email': vendor.email,
-                'full_name': vendor.full_name,
-                'mobile': vendor.mobile,
-                'business': vendor.business,
-                'experience_level': vendor.experience_level,
-                'city': vendor.city,
-                'state': vendor.state,
-                'pincode': vendor.pincode,
-                'location': vendor.location,
-                'services': vendor.services,
-                'is_verified': vendor.is_verified,
-                'onboarding_completed': vendor.onboarding_completed,
+                'id': user.id,
+                'email': user.email,
+                'full_name': f"{user.first_name} {user.last_name}".strip(),
+                'mobile': user.phone,
+                'business': user.business,
+                'experience_level': user.experience_level,
+                'city': user.city,
+                'state': user.state,
+                'pincode': user.pincode,
+                'location': user.location,
+                'services': profile.profile_data.get('services', []),
+                'is_verified': user.is_verified,
+                'onboarding_completed': user.onboarding_completed,
                 'user_type': 'vendor',
                 'profile_data': profile.profile_data,
                 'profile_completed': profile.is_completed
             }, status=200)
         
         elif request.method == 'PUT':
-            # Update vendor profile
             data = request.data
             
-            # Update VendorAuth fields
-            for field in ['full_name', 'mobile', 'business', 'experience_level', 'city', 'state', 'pincode', 'location', 'services']:
+            if 'full_name' in data:
+                parts = data['full_name'].split()
+                user.first_name = parts[0] if parts else ''
+                user.last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
+            
+            for field in ['phone', 'business', 'experience_level', 'city', 'state', 'pincode', 'location']:
                 if field in data:
-                    setattr(vendor, field, data[field])
+                    if field == 'phone':
+                        user.phone = data[field]
+                    else:
+                        setattr(user, field, data[field])
             
-            vendor.save()
+            user.save()
             
-            # Update VendorProfile data
+            if 'services' in data:
+                profile.profile_data['services'] = data['services']
             if 'profile_data' in data:
                 profile.profile_data.update(data['profile_data'])
-                profile.is_completed = data.get('profile_completed', profile.is_completed)
-                profile.save()
+            if 'profile_completed' in data:
+                profile.is_completed = data['profile_completed']
+            profile.save()
             
             return Response({
                 'message': 'Profile updated successfully',
                 'vendor': {
-                    'id': vendor.id,
-                    'email': vendor.email,
-                    'full_name': vendor.full_name,
-                    'mobile': vendor.mobile,
-                    'business': vendor.business,
-                    'experience_level': vendor.experience_level,
-                    'city': vendor.city,
-                    'state': vendor.state,
-                    'pincode': vendor.pincode,
-                    'location': vendor.location,
-                    'services': vendor.services,
-                    'is_verified': vendor.is_verified,
-                    'onboarding_completed': vendor.onboarding_completed,
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': f"{user.first_name} {user.last_name}".strip(),
+                    'mobile': user.phone,
+                    'business': user.business,
+                    'experience_level': user.experience_level,
+                    'city': user.city,
+                    'state': user.state,
+                    'pincode': user.pincode,
+                    'location': user.location,
+                    'services': profile.profile_data.get('services', []),
+                    'is_verified': user.is_verified,
+                    'onboarding_completed': user.onboarding_completed,
                     'user_type': 'vendor',
                     'profile_data': profile.profile_data,
                     'profile_completed': profile.is_completed
@@ -343,9 +319,6 @@ def vendor_profile(request):
             }, status=200)
             
     except Exception as e:
-        print(f"Profile error: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return Response({'error': 'Profile operation failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
@@ -396,44 +369,23 @@ def vendor_token_refresh(request):
     except:
         return Response({'error': 'Invalid refresh token'}, status=401)
 
-@csrf_exempt
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def complete_onboarding(request):
     """Mark vendor onboarding as completed"""
-    print(f"Complete onboarding called - Headers: {dict(request.headers)}")
-    auth_header = request.headers.get('Authorization', '')
-    print(f"Auth header: {auth_header}")
-    
-    if auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        print(f"Token: {token[:20]}...")
-        try:
-            import jwt
-            from django.conf import settings
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            print(f"Token payload: {payload}")
-            vendor_id = payload.get('vendor_id')
-            print(f"Vendor ID from token: {vendor_id}")
-            
-            if vendor_id:
-                vendor = VendorAuth.objects.get(id=vendor_id)
-                print(f"Found vendor: {vendor.full_name}, current onboarding_completed: {vendor.onboarding_completed}")
-                vendor.onboarding_completed = True
-                vendor.save()
-                print(f"Updated onboarding_completed to: {vendor.onboarding_completed}")
-                
-                return Response({
-                    'message': 'Onboarding completed successfully',
-                    'vendor': {
-                        'id': vendor.id,
-                        'onboarding_completed': vendor.onboarding_completed
-                    }
-                }, status=200)
-        except Exception as e:
-            print(f"Complete onboarding error: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return Response({'error': str(e)}, status=400)
-    
-    print("No valid auth header found")
-    return Response({'error': 'Authentication required'}, status=401)
+    try:
+        if request.user.user_type != 'vendor':
+            return Response({'error': 'Vendor access required'}, status=403)
+        
+        request.user.onboarding_completed = True
+        request.user.save()
+        
+        return Response({
+            'message': 'Onboarding completed successfully',
+            'vendor': {
+                'id': request.user.id,
+                'onboarding_completed': request.user.onboarding_completed
+            }
+        }, status=200)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

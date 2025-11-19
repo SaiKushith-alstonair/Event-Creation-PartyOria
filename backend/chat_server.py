@@ -55,35 +55,15 @@ def authenticate_user(token):
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             logger.info(f"JWT payload: {payload}")
             
-            # Check if it's a vendor token first by looking for vendor_id
-            vendor_id = payload.get('vendor_id')
-            if vendor_id:
-                logger.info(f"Detected vendor token with vendor_id: {vendor_id}")
-                from vendors.models import VendorAuth
-                try:
-                    vendor = VendorAuth.objects.select_related('chat_user').get(id=vendor_id)
-                    chat_user = vendor.get_or_create_chat_user()
-                    logger.info(f"Vendor JWT auth successful for {vendor.full_name} -> chat_user {chat_user.username} (ID: {chat_user.id})")
-                    return chat_user
-                except VendorAuth.DoesNotExist:
-                    logger.warning(f"Vendor not found for vendor_id: {vendor_id}")
-            
-            # Check user_type in payload
-            user_type = payload.get('user_type')
-            if user_type == 'vendor' and vendor_id:
-                logger.info(f"Token marked as vendor type with vendor_id: {vendor_id}")
-                # Already handled above
-                pass
-            
-            # Otherwise try customer token
+            # Get user_id from JWT
             user_id = payload.get('user_id')
-            if user_id and user_type != 'vendor':
+            if user_id:
                 try:
                     user = CustomUser.objects.get(id=user_id)
-                    logger.info(f"Customer JWT auth successful for user {user.username} (ID: {user.id})")
+                    logger.info(f"JWT auth successful for user {user.username} (ID: {user.id}, Type: {user.user_type})")
                     return user
                 except CustomUser.DoesNotExist:
-                    logger.warning(f"Customer not found for user_id: {user_id}")
+                    logger.warning(f"User not found for user_id: {user_id}")
             
             logger.warning(f"No valid user found in JWT payload: {payload}")
                 

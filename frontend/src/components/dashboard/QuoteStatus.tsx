@@ -36,13 +36,16 @@ export const QuoteStatus: React.FC<QuoteStatusProps> = ({ eventId, eventName }) 
       
       setQuoteStatus(statusData);
       setResponses(responsesData.responses || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading quote data:', error);
+      const errorMsg = error?.message?.includes('404') ? 'Event not found' : 'Failed to load quote status';
       toast({
         title: "Error",
-        description: "Failed to load quote status",
+        description: errorMsg,
         variant: "destructive"
       });
+      setQuoteStatus(null);
+      setResponses([]);
     } finally {
       setLoading(false);
     }

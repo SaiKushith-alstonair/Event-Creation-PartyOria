@@ -70,7 +70,10 @@ export const useNotifications = () => {
   // Load notifications
   const loadNotifications = useCallback(async () => {
     const token = getAuthToken();
-    if (!token) return;
+    if (!token) {
+      setNotifications([]);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -89,7 +92,7 @@ export const useNotifications = () => {
         setNotifications([]);
       }
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      // Silently fail - don't log auth errors
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -120,7 +123,7 @@ export const useNotifications = () => {
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('Error loading unread count:', error);
+      // Silently fail - don't log auth errors
       setUnreadCount(0);
     }
   }, [getAuthToken]);
@@ -206,7 +209,7 @@ export const useNotifications = () => {
         setPreferences(null);
       }
     } catch (error) {
-      console.error('Error loading preferences:', error);
+      // Silently fail - don't log auth errors
       setPreferences(null);
     }
   }, [getAuthToken]);
@@ -290,11 +293,14 @@ export const useNotifications = () => {
     return () => clearInterval(interval);
   }, [loadUnreadCount]);
 
-  // Initial load
+  // Initial load - only if authenticated
   useEffect(() => {
-    loadUnreadCount();
-    loadPreferences();
-  }, [loadUnreadCount, loadPreferences]);
+    const token = getAuthToken();
+    if (token) {
+      loadUnreadCount();
+      loadPreferences();
+    }
+  }, [loadUnreadCount, loadPreferences, getAuthToken]);
 
   return {
     notifications,

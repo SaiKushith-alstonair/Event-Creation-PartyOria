@@ -226,13 +226,32 @@ export default function QuoteRequestModal({ isOpen, onClose, prefilledEvent, sel
         selected_venues: formData.selectedVenues.map(v => ({ name: v, category: v }))
       }
 
+      // Get token from Zustand
+      const authStorage = localStorage.getItem('auth-storage')
+      let token = null
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          token = authData?.state?.tokens?.access
+        } catch (e) {
+          console.error('Failed to parse auth storage:', e)
+        }
+      }
+
+      if (!token) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to request quotes.",
+          variant: "destructive"
+        })
+        return
+      }
+
       const response = await fetch('http://127.0.0.1:8000/api/quote-requests/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('access_token') && {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          })
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(apiData)
       })
@@ -247,9 +266,7 @@ export default function QuoteRequestModal({ isOpen, onClose, prefilledEvent, sel
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                ...(localStorage.getItem('access_token') && {
-                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                })
+                'Authorization': `Bearer ${token}`
               }
             })
             

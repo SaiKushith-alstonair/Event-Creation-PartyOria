@@ -46,12 +46,20 @@ export const VendorQuoteManager: React.FC = () => {
       
       for (const endpoint of endpoints) {
         try {
+          // Get token from auth-storage (same for both customer and vendor)
+          const authStorage = localStorage.getItem('auth-storage');
+          let token = null;
+          if (authStorage) {
+            try {
+              const authData = JSON.parse(authStorage);
+              token = authData?.state?.tokens?.access;
+            } catch (e) {}
+          }
+          
           const response = await fetch(endpoint, {
             headers: {
               'Content-Type': 'application/json',
-              ...(localStorage.getItem('access_token') && {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-              })
+              ...(token && { 'Authorization': `Bearer ${token}` })
             }
           });
           
@@ -125,13 +133,21 @@ export const VendorQuoteManager: React.FC = () => {
       
       for (const endpoint of endpoints) {
         try {
+          // Get token from auth-storage
+          const authStorage = localStorage.getItem('auth-storage');
+          let token = null;
+          if (authStorage) {
+            try {
+              const authData = JSON.parse(authStorage);
+              token = authData?.state?.tokens?.access;
+            } catch (e) {}
+          }
+          
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(localStorage.getItem('access_token') && {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-              })
+              ...(token && { 'Authorization': `Bearer ${token}` })
             },
             body: JSON.stringify(quoteData)
           });

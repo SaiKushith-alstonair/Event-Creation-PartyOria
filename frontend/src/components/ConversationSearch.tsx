@@ -59,17 +59,24 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token') || 
+      // Get token from Zustand first
+      const authStorage = localStorage.getItem('auth-storage');
+      let authToken = null;
+      
+      if (authStorage) {
+        try {
+          const parsed = JSON.parse(authStorage);
+          authToken = parsed?.state?.tokens?.access;
+        } catch (e) {
+          console.error('Failed to parse auth-storage:', e);
+        }
+      }
+      
+      // Fallback to direct localStorage
+      if (!authToken) {
+        authToken = localStorage.getItem('access_token') || 
                     localStorage.getItem('authToken') || 
                     localStorage.getItem('token');
-      
-      const vendorProfile = localStorage.getItem('vendor_profile');
-      let authToken = token;
-      if (vendorProfile && !token) {
-        const vendorData = JSON.parse(vendorProfile);
-        if (vendorData.access_token) {
-          authToken = vendorData.access_token;
-        }
       }
 
       if (!authToken) return;

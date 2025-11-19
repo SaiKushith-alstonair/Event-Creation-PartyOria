@@ -56,27 +56,7 @@ export default function LoginPage() {
         return;
       }
       
-      // Clear any existing auth data first
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('partyoria_user');
-      localStorage.removeItem('vendor_profile');
-      sessionStorage.removeItem('access_token');
-      sessionStorage.removeItem('refresh_token');
-      sessionStorage.removeItem('partyoria_user');
-      
-      // Handle JWT-based authentication for both customer and vendor
       if (userType === 'vendor' && data.vendor && data.access) {
-        // Vendor JWT login - store tokens and user data
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-        sessionStorage.setItem('access_token', data.access);
-        sessionStorage.setItem('refresh_token', data.refresh);
-        localStorage.setItem('vendor_profile', JSON.stringify(data.vendor));
-        localStorage.setItem('vendorOnboarding', JSON.stringify(data.vendor));
-        
-        // Update auth store for RouteGuard using proper Zustand setState
-        const { useAuthStore } = await import('../../stores/authStore');
         useAuthStore.setState({
           user: {
             id: data.vendor.id,
@@ -95,27 +75,12 @@ export default function LoginPage() {
           error: null
         });
         
-        console.log('Vendor login successful:', data.vendor);
-        
-        // Route based on onboarding status
         if (data.vendor.onboarding_completed) {
-          window.location.href = '/vendor/dashboard';
+          navigate('/vendor/dashboard', { replace: true });
         } else {
-          window.location.href = '/vendor/onboarding';
+          navigate('/vendor/onboarding', { replace: true });
         }
       } else if (data.user && data.access) {
-        // Customer JWT login - store tokens in both storages
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-        sessionStorage.setItem('access_token', data.access);
-        sessionStorage.setItem('refresh_token', data.refresh);
-        localStorage.setItem('partyoria_user', JSON.stringify(data.user));
-        
-        const { setAuthData } = await import('../../utils/auth');
-        setAuthData(data.user);
-        
-        // Update auth store
-        const { useAuthStore } = await import('../../stores/authStore');
         useAuthStore.setState({
           user: {
             id: data.user.id,
@@ -134,9 +99,7 @@ export default function LoginPage() {
           error: null
         });
         
-        console.log('Customer login successful:', data.user);
-        // Use navigate instead of window.location.href to maintain React state
-        setTimeout(() => navigate('/dashboard', { replace: true }), 100);
+        navigate('/dashboard', { replace: true });
       }
     } catch (error: any) {
       console.error('Login error:', error);

@@ -140,22 +140,10 @@ export const useAuthStore = create<AuthState>()(
           try {
             const response = await authAPI.login(email, password);
             
-            // Handle different token response formats
             const tokens = response.tokens || {
               access: response.access,
               refresh: response.refresh
             };
-            
-            // Also save to localStorage for API service compatibility
-            if (tokens.access) {
-              localStorage.setItem('access_token', tokens.access);
-            }
-            if (tokens.refresh) {
-              localStorage.setItem('refresh_token', tokens.refresh);
-            }
-            
-            // Save user data to localStorage for RouteGuard compatibility
-            localStorage.setItem('partyoria_user', JSON.stringify(response.user));
             
             set({
               user: response.user,
@@ -196,26 +184,6 @@ export const useAuthStore = create<AuthState>()(
         },
 
         logout: async () => {
-          const { tokens } = get();
-          
-          try {
-            if (tokens?.refresh) {
-              await authAPI.logout(tokens.refresh);
-            }
-          } catch (error) {
-            console.error('Logout API call failed:', error);
-          }
-          
-          // Clear all possible token storage locations
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('token');
-          localStorage.removeItem('partyoria_user');
-          sessionStorage.removeItem('access_token');
-          sessionStorage.removeItem('refresh_token');
-          sessionStorage.removeItem('authToken');
-          
           set({
             user: null,
             tokens: null,
@@ -239,14 +207,10 @@ export const useAuthStore = create<AuthState>()(
               access: response.access,
             };
             
-            // Update localStorage
-            localStorage.setItem('access_token', response.access);
-            
             set({
               tokens: newTokens,
             });
           } catch (error) {
-            // If refresh fails, logout user
             get().logout();
             throw error;
           }
@@ -355,49 +319,3 @@ export const setupTokenRefresh = () => {
   }
 };
 
-// Initialize auth state on app start
-const initializeAuth = () => {
-  const accessToken = localStorage.getItem('access_token');
-  const userStr = localStorage.getItem('partyoria_user');
-  const vendorStr = localStorage.getItem('vendor_profile');
-  
-  if (accessToken && (userStr || vendorStr)) {
-    try {
-      let userData = null;
-      if (userStr) {
-        userData = JSON.parse(userStr);
-        userData.user_type = 'customer';
-      } else if (vendorStr) {
-        const vendorData = JSON.parse(vendorStr);
-        userData = {
-          id: vendorData.id,
-          email: vendorData.email,
-          username: vendorData.email,
-          first_name: vendorData.full_name || '',
-          last_name: '',
-          user_type: 'vendor'
-        };
-      }
-      
-      if (userData) {
-        useAuthStore.setState({
-          user: userData,
-          tokens: {
-            access: accessToken,
-            refresh: localStorage.getItem('refresh_token') || ''
-          },
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
-      }
-    } catch (error) {
-      console.error('Failed to restore auth state:', error);
-    }
-  }
-};
-
-// Initialize on module load
-if (typeof window !== 'undefined') {
-  initializeAuth();
-}

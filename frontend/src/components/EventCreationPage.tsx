@@ -1723,7 +1723,19 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
       const loadRequirements = async () => {
         setRequirementsLoaded(false);
         try {
-          const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`);
+          const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+          if (!token) {
+            setApiRequirements(getDefaultRequirements());
+            setRequirementsLoaded(true);
+            return;
+          }
+
+          const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
           const dbRequirements = await response.json();
           
           const grouped = dbRequirements.reduce((acc: Record<string, any[]>, req: any) => {
@@ -2427,7 +2439,19 @@ const EventCreationPage: React.FC<EventCreationPageProps> = ({
   const loadVendorServices = async () => {
     setLoadingVendors(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`);
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      if (!token) {
+        setApiVendorServices([]);
+        setLoadingVendors(false);
+        return;
+      }
+
+      const response = await fetch(`http://localhost:8000/api/events/requirements/?event_id=${subsectionId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       const data = await response.json();
       
       // Filter for Vendor Services category

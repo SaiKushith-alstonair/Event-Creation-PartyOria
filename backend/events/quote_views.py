@@ -7,8 +7,9 @@ from django.utils import timezone
 from django.db import models
 from datetime import timedelta, datetime
 from decimal import Decimal
-from .models import Event, QuoteRequest, VendorQuote
-from vendors.models import VendorAuth
+from .models import Event, QuoteRequest
+from authentication.models import CustomUser
+from vendors.models import VendorProfile
 from notifications.services import VendorNotifications, CustomerNotifications
 
 def parse_event_date(date_string):
@@ -84,7 +85,7 @@ def send_quote_requests(request, event_id):
             urgency='medium',
             user=quote_user,
             source_event=event,
-            selected_vendors=[v.full_name for v in matched_vendors],
+            selected_vendors=[f"{v.first_name} {v.last_name}".strip() for v in matched_vendors],
             quote_type='targeted'
         )
         
@@ -92,18 +93,17 @@ def send_quote_requests(request, event_id):
         notifications_sent = 0
         
         for vendor in matched_vendors:
-            if hasattr(vendor, 'chat_user') and vendor.chat_user:
-                try:
-                    VendorNotifications.new_quote_request(
-                        vendor.chat_user,
-                        event.form_data.get('clientName', 'Customer') if event.form_data else 'Customer',
-                        event.event_type,
-                        event.form_data.get('dateTime', 'TBD') if event.form_data else 'TBD',
-                        quote_request.id
-                    )
-                    notifications_sent += 1
-                except Exception as e:
-                    print(f"Failed to send notification to {vendor.full_name}: {e}")
+            try:
+                VendorNotifications.new_quote_request(
+                    vendor,
+                    event.form_data.get('clientName', 'Customer') if event.form_data else 'Customer',
+                    event.event_type,
+                    event.form_data.get('dateTime', 'TBD') if event.form_data else 'TBD',
+                    quote_request.id
+                )
+                notifications_sent += 1
+            except Exception as e:
+                print(f"Failed to send notification to {vendor.first_name} {vendor.last_name}: {e}")
         
         # Set status to vendors_notified (real vendors will respond later)
         quote_request.status = 'vendors_notified'
@@ -115,10 +115,10 @@ def send_quote_requests(request, event_id):
             'quote_request_id': quote_request.id,
             'vendor_count': len(matched_vendors),
             'vendors_contacted': [{
-                'name': v.full_name,
-                'business': v.business,
-                'category': map_service_to_category(v.business),
-                'location': v.location
+                'name': f"{v.first_name} {v.last_name}".strip(),
+                'business': v.business or 'General',
+                'category': map_service_to_category(v.business or 'general'),
+                'location': v.location or 'Not specified'
             } for v in matched_vendors],
             'notifications_sent': notifications_sent,
             'categories_matched': list(categories)
@@ -136,15 +136,18 @@ def vendor_quote_requests(request):
     """Get pending quote requests for vendor"""
     try:
         print(f"[VENDOR QUOTES] Authenticated user: {request.user.email}, ID: {request.user.id}, Type: {request.user.user_type}")
-        # Find vendor by email since JWT token is for CustomUser, not chat_user
-        vendor = get_object_or_404(VendorAuth, email=request.user.email)
-        print(f"[VENDOR QUOTES] Found vendor: {vendor.full_name}, ID: {vendor.id}, Business: {vendor.business}")
+        vendor = request.user
+        if vendor.user_type != 'vendor':
+            return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
+        print(f"[VENDOR QUOTES] Found vendor: {vendor_name}, ID: {vendor.id}, Business: {vendor.business}")
         
         quote_requests = QuoteRequest.objects.filter(
-            selected_vendors__contains=[vendor.full_name],
+            selected_vendors__contains=vendor_name,
             status__in=['pending', 'vendors_notified']
         ).order_by('-created_at')
-        print(f"[VENDOR QUOTES] Found {quote_requests.count()} quote requests for vendor {vendor.full_name}")
+        print(f"[VENDOR QUOTES] Found {quote_requests.count()} quote requests for vendor {vendor_name}")
         
         data = []
         for qr in quote_requests:
@@ -171,18 +174,20 @@ def vendor_quote_requests(request):
             'quote_requests': data
         })
         
-    except VendorAuth.DoesNotExist:
+    except Exception as e:
         return Response({
             'success': False,
-            'error': 'Vendor profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def quote_request_detail(request, quote_id):
     """Get detailed quote request information"""
     try:
-        vendor = get_object_or_404(VendorAuth, email=request.user.email)
+        vendor = request.user
+        if vendor.user_type != 'vendor':
+            return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
         quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
         # Mark as viewed
@@ -219,7 +224,7 @@ def quote_request_detail(request, quote_id):
             }
         })
         
-    except (VendorAuth.DoesNotExist, QuoteRequest.DoesNotExist):
+    except QuoteRequest.DoesNotExist:
         return Response({
             'success': False,
             'error': 'Quote request not found'
@@ -230,11 +235,15 @@ def quote_request_detail(request, quote_id):
 def submit_quote(request, quote_id):
     """Submit quote response"""
     try:
-        vendor = get_object_or_404(VendorAuth, email=request.user.email)
+        vendor = request.user
+        if vendor.user_type != 'vendor':
+            return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
         quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
         # Check if vendor is in selected vendors
-        if vendor.full_name not in quote_request.selected_vendors:
+        if vendor_name not in quote_request.selected_vendors:
             return Response({
                 'success': False,
                 'error': 'Not authorized for this quote'
@@ -250,7 +259,7 @@ def submit_quote(request, quote_id):
         
         # Store quote response in quote request
         vendor_responses = quote_request.vendor_responses or {}
-        vendor_responses[vendor.full_name] = {
+        vendor_responses[vendor_name] = {
             'quote_amount': float(quote_amount),
             'message': request.data.get('message', ''),
             'includes': request.data.get('includes', []),
@@ -270,7 +279,7 @@ def submit_quote(request, quote_id):
         if quote_request.user:
             CustomerNotifications.quote_received(
                 quote_request.user,
-                vendor.full_name,
+                vendor_name,
                 float(quote_amount),
                 quote_request.event_type,
                 quote_request.id
@@ -337,39 +346,21 @@ def event_quotes(request, event_id):
 def accept_quote(request, quote_id):
     """Accept a vendor quote"""
     try:
-        quote = get_object_or_404(VendorQuote, id=quote_id, quote_request__event__user=request.user)
+        quote_request = get_object_or_404(QuoteRequest, id=quote_id, user=request.user)
+        vendor_name = request.data.get('vendor_name')
         
-        # Update quote status
-        quote.status = 'accepted'
-        quote.responded_at = timezone.now()
-        quote.save()
+        if not vendor_name or vendor_name not in quote_request.vendor_responses:
+            return Response({'success': False, 'error': 'Vendor not found'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Reject other quotes for same requirement
-        VendorQuote.objects.filter(
-            quote_request__event=quote.quote_request.event,
-            quote_request__requirement_category=quote.quote_request.requirement_category
-        ).exclude(id=quote_id).update(status='rejected')
+        # Update vendor response status
+        quote_request.vendor_responses[vendor_name]['status'] = 'accepted'
+        quote_request.status = 'completed'
+        quote_request.save()
         
-        # Notify vendor
-        if quote.quote_request.vendor.chat_user:
-            VendorNotifications.quote_accepted(
-                quote.quote_request.vendor.chat_user,
-                quote.quote_request.event.form_data.get('clientName', 'Customer'),
-                float(quote.quote_amount),
-                quote.quote_request.event.event_type,
-                quote.id
-            )
+        return Response({'success': True, 'message': 'Quote accepted successfully'})
         
-        return Response({
-            'success': True,
-            'message': 'Quote accepted successfully'
-        })
-        
-    except VendorQuote.DoesNotExist:
-        return Response({
-            'success': False,
-            'error': 'Quote not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+    except QuoteRequest.DoesNotExist:
+        return Response({'success': False, 'error': 'Quote not found'}, status=status.HTTP_404_NOT_FOUND)
 
 # Helper functions
 def match_vendors_to_event(event):
@@ -407,7 +398,7 @@ def match_vendors_to_event(event):
     
     try:
         # Get all active vendors first
-        vendors_query = VendorAuth.objects.filter(is_active=True)
+        vendors_query = CustomUser.objects.filter(user_type='vendor', is_active=True)
         
         # Filter by location if available
         if location:
@@ -418,14 +409,30 @@ def match_vendors_to_event(event):
             if location_vendors.exists():
                 vendors_query = location_vendors
         
-        # Match vendors by business type or services
+        # Match vendors by multiple criteria
         for category in categories:
-            category_vendors = vendors_query.filter(
-                models.Q(business__icontains=category) |
-                models.Q(services__icontains=category) |
-                models.Q(full_name__icontains=category)
+            # 1. Match by business field in CustomUser
+            business_vendors = vendors_query.filter(business__icontains=category)
+            matched_vendors.extend(business_vendors)
+            
+            # 2. Match by services in VendorProfile.profile_data (handles both string and array)
+            profile_vendors = vendors_query.filter(
+                vendor_profile__profile_data__services__icontains=category
             )
-            matched_vendors.extend(category_vendors)
+            matched_vendors.extend(profile_vendors)
+            
+            # 3. Match by VendorService.category
+            service_vendors = vendors_query.filter(
+                vendor_services__category__icontains=category
+            )
+            matched_vendors.extend(service_vendors)
+            
+            # 4. Match by name (first_name or last_name)
+            name_vendors = vendors_query.filter(
+                models.Q(first_name__icontains=category) | 
+                models.Q(last_name__icontains=category)
+            )
+            matched_vendors.extend(name_vendors)
         
         # If no category matches, get all available vendors
         if not matched_vendors:

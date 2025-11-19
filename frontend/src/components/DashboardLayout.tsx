@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { Dashboard, MyEvents, Messages, Payments, Settings, BudgetAnalytics, QuoteManagement } from './dashboard';
 import QuotesDashboard from './dashboard/QuotesDashboard';
 import RSVPManager from './dashboard/RSVPManager';
@@ -34,19 +35,17 @@ const DashboardLayout: React.FC = () => {
   };
 
   useEffect(() => {
-    // Check authentication without auto-redirect
     if (!isAuthenticated()) {
       navigate('/', { replace: true });
       return;
     }
 
-    // Get user data from storage
     const user = getUserData();
     if (user) {
       setUserType(user.user_type || 'customer');
-      setUserName(user.firstName || user.username || 'User');
+      setUserName(user.first_name || user.username || 'User');
     }
-  }, []);
+  }, [navigate]);
 
   const handleLogout = () => {
     // Clear all auth data
@@ -54,12 +53,12 @@ const DashboardLayout: React.FC = () => {
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('partyoria_user');
     localStorage.removeItem('vendor_profile');
+    localStorage.removeItem('auth-storage');
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
     sessionStorage.removeItem('partyoria_user');
     
     // Clear auth store
-    const { useAuthStore } = require('../stores/authStore');
     useAuthStore.getState().logout();
     
     navigate('/', { replace: true });
@@ -234,12 +233,7 @@ const DashboardLayout: React.FC = () => {
       case 'requote':
         return <RequotePage onNavigate={setActiveComponent} />;
       case 'quotes':
-        return (
-          <div className="p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">My Quotes</h1>
-            <QuotesDashboard eventId={12} eventName="Wedding" />
-          </div>
-        );
+        return <QuoteManagement onNavigate={setActiveComponent} />;
       case 'quote-management':
         return <QuoteManagement onNavigate={setActiveComponent} />;
       case 'rsvp-manager':
@@ -259,7 +253,7 @@ const DashboardLayout: React.FC = () => {
     const user = getUserData();
     if (user) {
       return {
-        name: user.firstName || user.username || 'User',
+        name: user.first_name || user.username || 'User',
         email: user.email || 'user@example.com',
         type: user.user_type || 'customer'
       };

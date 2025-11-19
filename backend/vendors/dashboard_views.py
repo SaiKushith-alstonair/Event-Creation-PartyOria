@@ -71,14 +71,10 @@ def vendor_services(request, service_id=None):
         if request.user.user_type != 'vendor':
             return Response({'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
         
-        from .models import VendorAuth, VendorService
+        from .models import VendorService
         
-        try:
-            vendor = VendorAuth.objects.get(email=request.user.email)
-            print(f"Found vendor: {vendor.id} - {vendor.full_name}")
-        except VendorAuth.DoesNotExist:
-            print(f"Vendor not found for email: {request.user.email}")
-            return Response({'error': 'Vendor not found'}, status=status.HTTP_404_NOT_FOUND)
+        vendor = request.user
+        print(f"Found vendor: {vendor.id} - {vendor.first_name} {vendor.last_name}")
         
         if request.method == 'GET':
             try:

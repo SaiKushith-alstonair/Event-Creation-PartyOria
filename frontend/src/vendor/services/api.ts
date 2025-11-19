@@ -7,7 +7,24 @@ interface ApiResponse<T> {
 
 class ApiService {
   private getAuthHeaders() {
-    const token = localStorage.getItem('access_token');
+    // Read from Zustand auth-storage
+    const authStorage = localStorage.getItem('auth-storage');
+    let token = null;
+    
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        token = parsed?.state?.tokens?.access;
+      } catch (e) {
+        console.error('Failed to parse auth-storage:', e);
+      }
+    }
+    
+    // Fallback to direct localStorage for backward compatibility
+    if (!token) {
+      token = localStorage.getItem('access_token');
+    }
+    
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -21,7 +38,24 @@ class ApiService {
   }
 
   private async refreshToken(): Promise<boolean> {
-    const refreshToken = localStorage.getItem('refresh_token');
+    // Read from Zustand auth-storage
+    const authStorage = localStorage.getItem('auth-storage');
+    let refreshToken = null;
+    
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        refreshToken = parsed?.state?.tokens?.refresh;
+      } catch (e) {
+        console.error('Failed to parse auth-storage:', e);
+      }
+    }
+    
+    // Fallback to direct localStorage
+    if (!refreshToken) {
+      refreshToken = localStorage.getItem('refresh_token');
+    }
+    
     if (!refreshToken) {
       console.log('No refresh token available');
       return false;
@@ -37,6 +71,22 @@ class ApiService {
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Update Zustand auth-storage
+        const authStorage = localStorage.getItem('auth-storage');
+        if (authStorage) {
+          try {
+            const parsed = JSON.parse(authStorage);
+            if (parsed?.state?.tokens) {
+              parsed.state.tokens.access = data.access;
+              localStorage.setItem('auth-storage', JSON.stringify(parsed));
+            }
+          } catch (e) {
+            console.error('Failed to update auth-storage:', e);
+          }
+        }
+        
+        // Also update direct localStorage for backward compatibility
         localStorage.setItem('access_token', data.access);
         console.log('Token refreshed successfully');
         return true;

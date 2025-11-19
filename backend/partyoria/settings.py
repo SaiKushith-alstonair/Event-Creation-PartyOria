@@ -164,7 +164,6 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'authentication.vendor_jwt_auth.VendorJWTAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
@@ -197,7 +196,6 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'TOKEN_TYPE_CLAIM': 'token_type',
-    'USER_AUTHENTICATION_RULE': 'authentication.vendor_jwt_auth.VendorJWTAuthentication.get_user',
 }
 
 # CORS Configuration - Secure for production

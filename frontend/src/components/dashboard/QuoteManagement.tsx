@@ -9,10 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 import { toast } from "@/components/ui/use-toast"
 
 interface QuoteManagementProps {
+  eventId?: number
   onNavigate?: (component: string) => void
 }
 
-export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {}) {
+export default function QuoteManagement({ eventId, onNavigate }: QuoteManagementProps = {}) {
   const { toast } = useToast()
   const [quotes, setQuotes] = useState<any[]>([])
   const [selectedQuote, setSelectedQuote] = useState<any>(null)
@@ -30,12 +31,32 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
 
   const loadQuotes = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/quote-requests/', {
+      // Get token from Zustand
+      const authStorage = localStorage.getItem('auth-storage')
+      let token = null
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          token = authData?.state?.tokens?.access
+        } catch (e) {
+          console.error('Failed to parse auth storage:', e)
+        }
+      }
+
+      if (!token) {
+        setQuotes([])
+        setStats({ total: 0, pending: 0, completed: 0, targeted: 0 })
+        return
+      }
+
+      const url = eventId 
+        ? `http://127.0.0.1:8000/api/quote-requests/?event_id=${eventId}`
+        : 'http://127.0.0.1:8000/api/quote-requests/'
+      
+      const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('access_token') && {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          })
+          'Authorization': `Bearer ${token}`
         }
       })
       
@@ -49,9 +70,7 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
               const detailResponse = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quote.id}/quote-details/`, {
                 headers: {
                   'Content-Type': 'application/json',
-                  ...(localStorage.getItem('access_token') && {
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                  })
+                  'Authorization': `Bearer ${token}`
                 }
               })
               if (detailResponse.ok) {
@@ -75,7 +94,7 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
           targeted: quotesWithDetails.filter(q => q.quote_type === 'targeted').length
         })
       } else {
-        console.error('API response not ok:', response.status)
+        console.error('Failed to load quotes:', response.status, response.statusText)
         setQuotes([])
         setStats({ total: 0, pending: 0, completed: 0, targeted: 0 })
       }
@@ -115,12 +134,21 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
 
   const handleViewQuote = async (quote: any) => {
     try {
+      const authStorage = localStorage.getItem('auth-storage')
+      let token = null
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          token = authData?.state?.tokens?.access
+        } catch (e) {}
+      }
+
+      if (!token) return
+
       const response = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quote.id}/quote-details/`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('access_token') && {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          })
+          'Authorization': `Bearer ${token}`
         }
       })
       if (response.ok) {
@@ -139,13 +167,22 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
   const handleClearAllQuotes = async () => {
     if (window.confirm('Are you sure you want to clear all quote requests? This action cannot be undone.')) {
       try {
+        const authStorage = localStorage.getItem('auth-storage')
+        let token = null
+        if (authStorage) {
+          try {
+            const authData = JSON.parse(authStorage)
+            token = authData?.state?.tokens?.access
+          } catch (e) {}
+        }
+
+        if (!token) return
+
         const response = await fetch('http://127.0.0.1:8000/api/quote-requests/clear-all/', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-            ...(localStorage.getItem('access_token') && {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            })
+            'Authorization': `Bearer ${token}`
           }
         })
         
@@ -173,12 +210,21 @@ export default function QuoteManagement({ onNavigate }: QuoteManagementProps = {
 
   const loadVendorResponses = async (quoteId: number) => {
     try {
+      const authStorage = localStorage.getItem('auth-storage')
+      let token = null
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          token = authData?.state?.tokens?.access
+        } catch (e) {}
+      }
+
+      if (!token) return []
+
       const response = await fetch(`http://127.0.0.1:8000/api/quote-requests/${quoteId}/responses/`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('access_token') && {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          })
+          'Authorization': `Bearer ${token}`
         }
       })
       

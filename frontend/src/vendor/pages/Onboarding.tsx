@@ -359,7 +359,6 @@ const Onboarding = () => {
       setIsCompleting(true);
 
       const vendorData = {
-        email: updatedFormData.email,
         full_name: updatedFormData.fullName,
         mobile: updatedFormData.mobile,
         business: updatedFormData.business,
@@ -369,7 +368,6 @@ const Onboarding = () => {
         state: updatedFormData.state,
         pincode: updatedFormData.pincode,
         services: updatedFormData.services.join(","),
-        password: updatedFormData.password,
       };
 
       try {
@@ -378,44 +376,29 @@ const Onboarding = () => {
         console.log('Profile update result:', result);
 
         if (result.data || !result.error) {
-          // Mark onboarding as completed
-          const onboardingResult = await apiService.completeOnboarding();
-          console.log('Onboarding completion result:', onboardingResult);
+          const vendorInfo = result.data.vendor || result.data;
           
-          // Update existing user data
-          const existingUser = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user');
-          if (existingUser) {
-            const userData = JSON.parse(existingUser);
-            userData.full_name = updatedFormData.fullName;
-            userData.mobile = updatedFormData.mobile;
-            userData.business = updatedFormData.business;
-            userData.location = updatedFormData.location;
-            userData.city = updatedFormData.city;
-            userData.state = updatedFormData.state;
-            userData.pincode = updatedFormData.pincode;
-            userData.onboarding_completed = true;
-            
-            // Update both session and local storage
-            sessionStorage.setItem('partyoria_user', JSON.stringify(userData));
-            localStorage.setItem('partyoria_user', JSON.stringify(userData));
-          }
-          
-          // Store vendor profile data
-          const vendorProfile = {
-            id: Date.now(),
+          // Store user data
+          const userData = {
+            id: vendorInfo.id,
             email: updatedFormData.email,
             full_name: updatedFormData.fullName,
             mobile: updatedFormData.mobile,
             business: updatedFormData.business,
-            experience_level: "Intermediate",
             location: updatedFormData.location,
             city: updatedFormData.city,
             state: updatedFormData.state,
             pincode: updatedFormData.pincode,
+            user_type: 'vendor',
             is_verified: false,
             onboarding_completed: true
           };
-          localStorage.setItem('vendor_profile', JSON.stringify(vendorProfile));
+          
+          sessionStorage.setItem('partyoria_user', JSON.stringify(userData));
+          localStorage.setItem('partyoria_user', JSON.stringify(userData));
+          
+          // Store vendor profile
+          localStorage.setItem('vendor_profile', JSON.stringify(vendorInfo));
           
           // Store onboarding data for dashboard compatibility
           const vendorOnboarding = {
@@ -435,8 +418,8 @@ const Onboarding = () => {
           localStorage.setItem('vendorOnboarding', JSON.stringify(vendorOnboarding));
 
           toast.success("Profile setup completed!");
-          // Use immediate navigation to prevent timing issues
-          navigate('/dashboard', { replace: true });
+          // Navigate to vendor dashboard
+          navigate('/vendor/dashboard', { replace: true });
         } else {
           toast.error(
             "Profile update failed: " + (result.error || "Unknown error")

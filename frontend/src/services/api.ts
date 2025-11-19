@@ -226,8 +226,13 @@ class ApiService {
           
           return newToken;
         } else {
-          // Refresh failed, clear all tokens
+          // Refresh failed, clear all tokens and redirect to login
+          console.warn('Token refresh failed - logging out user');
           this.clearAllTokens();
+          // Redirect to login page
+          if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+            window.location.href = '/';
+          }
           return null;
         }
       } catch (refreshError) {
@@ -266,15 +271,10 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        // If 401, clear tokens and redirect to login
+        // If 401, clear tokens but don't auto-redirect
         if (response.status === 401) {
           console.warn('Authentication failed - clearing tokens');
           this.clearAllTokens();
-          
-          // Redirect to login if we're not already there
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/vendor/login') {
-            window.location.href = '/login';
-          }
         }
         
         const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -298,12 +298,15 @@ class ApiService {
   // Events API
   async getEvents(): Promise<ApiEvent[]> {
     try {
+      const token = await this.refreshTokenIfNeeded();
+      if (!token) {
+        return [];
+      }
       const events = await this.request<ApiEvent[]>('/events/');
       safeLog(`API: Retrieved ${Array.isArray(events) ? events.length : 0} events`);
       return Array.isArray(events) ? events : [];
     } catch (error: any) {
       safeLog(`API: Failed to get events - ${error.message}`);
-      // Always return empty array for any error to prevent crashes
       return [];
     }
   }
@@ -360,9 +363,22 @@ class ApiService {
   }
 
   async deleteEvent(id: number): Promise<void> {
-    await this.request<void>(`/events/${id}/`, {
+    const url = `${API_BASE_URL}/events/${id}/`;
+    const token = await this.refreshTokenIfNeeded();
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
       method: 'DELETE',
+      headers
     });
+    
+    if (!response.ok && response.status !== 204) {
+      throw new Error(`HTTP ${response.status}`);
+    }
   }
 
   async searchEvents(query: string, eventType?: string): Promise<ApiEvent[]> {

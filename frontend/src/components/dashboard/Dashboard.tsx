@@ -32,44 +32,34 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   useEffect(() => {
+    // Check Zustand store first
+    const authStorage = localStorage.getItem('auth-storage')
+    if (authStorage) {
+      try {
+        const authData = JSON.parse(authStorage)
+        if (authData?.state?.user) {
+          const user = authData.state.user
+          setUserId(user.id || user.username)
+          setUserName(user.first_name || user.username || 'User')
+          loadRealTimeData(user.id || user.username)
+          return
+        }
+      } catch (e) {}
+    }
+
+    // Fallback to old storage
     const userStr = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user')
     if (userStr) {
       try {
         const user = JSON.parse(userStr)
-        const currentUserId = user.id || user.email || user.username
-        setUserId(currentUserId)
-        
-        // Set user name from various possible fields
-        if (user.first_name) {
-          setUserName(user.first_name)
-        } else if (user.firstName) {
-          setUserName(user.firstName)
-        } else if (user.username) {
-          setUserName(user.username)
-        }
-        
-        // User loaded successfully
-        
-        loadRealTimeData(currentUserId)
-        
-        // Show onboarding for new users
-        const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding')
-        if (!hasSeenOnboarding && events.length === 0) {
-          setShowOnboarding(true)
-        }
+        setUserId(user.id || user.username)
+        setUserName(user.first_name || user.firstName || user.username || 'User')
+        loadRealTimeData(user.id || user.username)
       } catch (e) {
         console.error('Failed to parse user data:', e)
-        // Clear invalid user data
         localStorage.removeItem('partyoria_user')
         sessionStorage.removeItem('partyoria_user')
       }
-    } else {
-      // No user data found, using default
-      // Set default user for development
-      const defaultUserId = 'saiku'
-      setUserId(defaultUserId)
-      setUserName('Guest User')
-      loadRealTimeData(defaultUserId)
     }
   }, [])
 
@@ -286,35 +276,6 @@ export default function Dashboard({ onNavigate }: DashboardProps = {}) {
           >
             <UserCheck className="mr-2 h-4 w-4" /> RSVP Manager
           </Button>
-          {!localStorage.getItem('access_token') && !sessionStorage.getItem('access_token') && (
-            <Button 
-              className="bg-white text-purple-600 hover:bg-gray-100 font-semibold touch-target w-full justify-center"
-              onClick={async () => {
-                setIsLoggingIn(true)
-                try {
-                  const response = await fetch('http://127.0.0.1:8000/api/auth/login/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: 'saiku', password: 'saiku123' })
-                  })
-                  if (response.ok) {
-                    const data = await response.json()
-                    localStorage.setItem('access_token', data.access)
-                    localStorage.setItem('refresh_token', data.refresh)
-                    localStorage.setItem('partyoria_user', JSON.stringify(data.user))
-                    window.location.reload()
-                  }
-                } catch (e) {
-                  console.error('Login failed:', e)
-                } finally {
-                  setIsLoggingIn(false)
-                }
-              }}
-              disabled={isLoggingIn}
-            >
-              <Bell className="mr-2 h-4 w-4" /> {isLoggingIn ? 'Logging in...' : 'Quick Login'}
-            </Button>
-          )}
         </div>
       </div>
 

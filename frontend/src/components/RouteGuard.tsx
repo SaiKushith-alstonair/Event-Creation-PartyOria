@@ -20,13 +20,12 @@ const RouteGuard: React.FC<RouteGuardProps> = ({
   const location = useLocation();
 
   useEffect(() => {
-    // Auth store handles initialization, just wait briefly for it
     const timer = setTimeout(() => {
       setIsChecking(false);
-    }, 50);
+    }, 100);
     
     return () => clearTimeout(timer);
-  }, [])
+  }, [isAuthenticated, user])
 
   if (isChecking) {
     return <div>Loading...</div>;

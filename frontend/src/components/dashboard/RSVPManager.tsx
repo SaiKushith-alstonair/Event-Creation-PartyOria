@@ -106,6 +106,12 @@ export default function RSVPManager({ onNavigate }: RSVPManagerProps = {}) {
     setLoading(true)
     try {
       const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      if (!token) {
+        setRSVPs([])
+        setLoading(false)
+        return
+      }
+
       const response = await fetch(`http://localhost:8000/api/events/rsvps/by-event/?event_id=${selectedEvent.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -136,6 +142,8 @@ export default function RSVPManager({ onNavigate }: RSVPManagerProps = {}) {
     
     try {
       const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      if (!token) return
+
       const response = await fetch(`http://localhost:8000/api/events/rsvps/stats/?event_id=${selectedEvent.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,

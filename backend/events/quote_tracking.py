@@ -4,43 +4,29 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import Event, QuoteRequest, VendorQuote
-from vendors.models import VendorAuth
+from .models import Event, QuoteRequest
+from authentication.models import CustomUser
 from notifications.services import VendorNotifications, CustomerNotifications
 
 @api_view(['GET'])
-@permission_classes([])
+@permission_classes([IsAuthenticated])
 def customer_quote_status(request, event_id):
     """Get quote status for customer - shows all quotes sent for their event"""
     try:
-        # Get event - handle both authenticated and unauthenticated users
-        if request.user.is_authenticated:
-            event = get_object_or_404(Event, id=event_id, user=request.user)
-            user_filter = request.user
-        else:
-            # For development, get event regardless of user
-            event = get_object_or_404(Event, id=event_id)
-            # Use the event's user if it exists, otherwise use user ID 2 (saiku)
-            if event.user:
-                user_filter = event.user
-            else:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                try:
-                    user_filter = User.objects.get(id=2)
-                except User.DoesNotExist:
-                    user_filter = None
+        # Check if event exists and belongs to user
+        try:
+            event = Event.objects.get(id=event_id, user=request.user)
+        except Event.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Event not found'
+            }, status=status.HTTP_404_NOT_FOUND)
         
         # Get all quote requests for this event
-        if user_filter:
-            quote_requests = QuoteRequest.objects.filter(
-                source_event_id=event_id,
-                user=user_filter
-            ).order_by('-created_at')
-        else:
-            quote_requests = QuoteRequest.objects.filter(
-                source_event_id=event_id
-            ).order_by('-created_at')
+        quote_requests = QuoteRequest.objects.filter(
+            source_event_id=event_id,
+            user=request.user
+        ).order_by('-created_at')
         
         quotes_data = []
         for qr in quote_requests:
@@ -80,11 +66,15 @@ def customer_quote_status(request, event_id):
 def vendor_pending_quotes(request):
     """Get pending quote requests for vendor"""
     try:
-        vendor = get_object_or_404(VendorAuth, chat_user=request.user)
+        vendor = request.user
+        if vendor.user_type != 'vendor':
+            return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
 
         # Find quote requests where this vendor is selected
         quote_requests = QuoteRequest.objects.filter(
-            selected_vendors__contains=[vendor.full_name],
+            selected_vendors__contains=[vendor_name],
             status__in=['pending', 'vendors_notified', 'responses_received']
         ).order_by('-created_at')
         
@@ -92,7 +82,7 @@ def vendor_pending_quotes(request):
         for qr in quote_requests:
             # Check if vendor has already responded
             has_responded = (qr.vendor_responses and 
-                           vendor.full_name in qr.vendor_responses)
+                           vendor_name in qr.vendor_responses)
             
             if not has_responded:
                 pending_quotes.append({
@@ -112,27 +102,31 @@ def vendor_pending_quotes(request):
         
         return Response({
             'success': True,
-            'vendor_name': vendor.full_name,
+            'vendor_name': vendor_name,
             'pending_quotes': pending_quotes,
             'count': len(pending_quotes)
         })
         
-    except VendorAuth.DoesNotExist:
+    except Exception as e:
         return Response({
             'success': False,
-            'error': 'Vendor profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def vendor_submit_quote_response(request, quote_id):
     """Vendor submits quote response"""
     try:
-        vendor = get_object_or_404(VendorAuth, chat_user=request.user)
+        vendor = request.user
+        if vendor.user_type != 'vendor':
+            return Response({'success': False, 'error': 'Vendor access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        vendor_name = f"{vendor.first_name} {vendor.last_name}".strip()
         quote_request = get_object_or_404(QuoteRequest, id=quote_id)
         
         # Verify vendor is authorized
-        if vendor.full_name not in quote_request.selected_vendors:
+        if vendor_name not in quote_request.selected_vendors:
             return Response({
                 'success': False,
                 'error': 'Not authorized for this quote'
@@ -152,16 +146,16 @@ def vendor_submit_quote_response(request, quote_id):
         
         # Store vendor response
         vendor_responses = quote_request.vendor_responses or {}
-        vendor_responses[vendor.full_name] = {
+        vendor_responses[vendor_name] = {
             'quote_amount': float(quote_amount),
             'message': message,
             'includes': includes,
             'excludes': excludes,
             'submitted_at': timezone.now().isoformat(),
             'vendor_id': vendor.id,
-            'vendor_business': vendor.business,
-            'vendor_location': vendor.location,
-            'vendor_phone': vendor.mobile,
+            'vendor_business': vendor.business or '',
+            'vendor_location': vendor.location or '',
+            'vendor_phone': vendor.phone or '',
             'vendor_email': vendor.email
         }
         
@@ -173,7 +167,7 @@ def vendor_submit_quote_response(request, quote_id):
         if quote_request.user:
             CustomerNotifications.quote_received(
                 quote_request.user,
-                vendor.full_name,
+                vendor_name,
                 float(quote_amount),
                 quote_request.event_type,
                 quote_request.id
@@ -192,37 +186,23 @@ def vendor_submit_quote_response(request, quote_id):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([])
+@permission_classes([IsAuthenticated])
 def quote_responses_for_event(request, event_id):
     """Get all quote responses for a specific event (customer view)"""
     try:
-        # Get event - handle both authenticated and unauthenticated users
-        if request.user.is_authenticated:
-            event = get_object_or_404(Event, id=event_id, user=request.user)
-            user_filter = request.user
-        else:
-            # For development, get event regardless of user
-            event = get_object_or_404(Event, id=event_id)
-            # Use the event's user if it exists, otherwise use user ID 2 (saiku)
-            if event.user:
-                user_filter = event.user
-            else:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                try:
-                    user_filter = User.objects.get(id=2)
-                except User.DoesNotExist:
-                    user_filter = None
+        # Check if event exists and belongs to user
+        try:
+            event = Event.objects.get(id=event_id, user=request.user)
+        except Event.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Event not found'
+            }, status=status.HTTP_404_NOT_FOUND)
         
-        if user_filter:
-            quote_requests = QuoteRequest.objects.filter(
-                source_event_id=event_id,
-                user=user_filter
-            )
-        else:
-            quote_requests = QuoteRequest.objects.filter(
-                source_event_id=event_id
-            )
+        quote_requests = QuoteRequest.objects.filter(
+            source_event_id=event_id,
+            user=request.user
+        )
         
         all_responses = []
         for qr in quote_requests:

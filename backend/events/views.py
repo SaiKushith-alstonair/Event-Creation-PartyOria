@@ -31,21 +31,12 @@ logger = logging.getLogger(__name__)
 class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
     queryset = Event.objects.all().order_by('-created_at')
     serializer_class = EventSerializer
-    permission_classes = []  # Allow both authenticated and unauthenticated access
-    authentication_classes = [JWTAuthentication]  # Enable JWT auth but don't require it
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     
     def get_queryset(self):
-        """Return events based on authentication status"""
-        try:
-            if self.request.user.is_authenticated:
-                logger.info(f"Authenticated user {self.request.user.id} requesting events")
-                return Event.objects.filter(user=self.request.user).order_by('-created_at')
-            else:
-                logger.info("Unauthenticated request, returning events for user ID 2")
-                return Event.objects.filter(user_id=2).order_by('-created_at')
-        except Exception as e:
-            logger.error(f"Error in get_queryset: {str(e)}")
-            return Event.objects.none()
+        """Return events for authenticated user only"""
+        return Event.objects.filter(user=self.request.user).order_by('-created_at')
     
     def list(self, request, *args, **kwargs):
         """List events for authenticated user with error handling"""
@@ -164,12 +155,10 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
         """Automatically assign the authenticated user to the event"""
         form_data = self.request.data.get('form_data', {})
         
-        # Extract values from form_data for Event model fields
         event_type = self.request.data.get('event_type') or form_data.get('event_type', 'other')
         attendees = self.request.data.get('attendees') or form_data.get('attendees', 50)
         duration_str = form_data.get('duration', '4')
         
-        # Parse duration from string like "4-6 hours" to integer
         try:
             if isinstance(duration_str, str) and '-' in duration_str:
                 duration = int(duration_str.split('-')[0])
@@ -178,57 +167,23 @@ class EventViewSet(viewsets.ModelViewSet, EventValidationMixin):
         except (ValueError, TypeError):
             duration = 4
         
-        # Parse budget
         total_budget = self.request.data.get('total_budget') or form_data.get('budget', 10000)
-        
-        # Get services from request data
         services = self.request.data.get('services', [])
         if not services or len(services) == 0:
-            services = ['general']  # Fallback
+            services = ['general']
         
-        # Final values determined
+        venue_type = 'indoor'
         
-        # Determine venue type based on event details
-        venue_type = 'indoor'  # Default, could be enhanced based on form data
-        
-        if self.request.user.is_authenticated and hasattr(self.request.user, 'id'):
-            serializer.save(
-                user=self.request.user,
-                created_by=f"{self.request.user.first_name} {self.request.user.last_name}".strip() or self.request.user.username,
-                event_type=event_type,
-                attendees=attendees,
-                duration=duration,
-                total_budget=total_budget,
-                venue_type=venue_type,
-                services=services
-            )
-        else:
-            # Force use user ID 2 (saiku) for now since authentication isn't working properly
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                user = User.objects.get(id=2)
-                serializer.save(
-                    user=user,
-                    created_by=user.username,
-                    event_type=event_type,
-                    attendees=attendees,
-                    duration=duration,
-                    total_budget=total_budget,
-                    venue_type=venue_type,
-                    services=services
-                )
-            except User.DoesNotExist:
-                serializer.save(
-                    user=None,
-                    created_by="Guest User",
-                    event_type=event_type,
-                    attendees=attendees,
-                    duration=duration,
-                    total_budget=total_budget,
-                    venue_type=venue_type,
-                    services=services
-                )
+        serializer.save(
+            user=self.request.user,
+            created_by=f"{self.request.user.first_name} {self.request.user.last_name}".strip() or self.request.user.username,
+            event_type=event_type,
+            attendees=attendees,
+            duration=duration,
+            total_budget=total_budget,
+            venue_type=venue_type,
+            services=services
+        )
 
     @action(detail=False, methods=['get'])
     def search(self, request):
@@ -1077,41 +1032,53 @@ def event_milestones(request, event_id=None):
 class QuoteRequestViewSet(viewsets.ModelViewSet):
     queryset = QuoteRequest.objects.all().order_by('-created_at')
     serializer_class = QuoteRequestSerializer
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     
     def get_queryset(self):
-        """Filter quote requests by authenticated user"""
-        if self.request.user.is_authenticated:
-            return QuoteRequest.objects.filter(user=self.request.user).order_by('-created_at')
-        # For unauthenticated requests, filter by user ID 2 (saiku) since that's who's creating quotes
-        return QuoteRequest.objects.filter(user_id=2).order_by('-created_at')
+        """Filter quote requests by authenticated user and event"""
+        event_id = self.request.query_params.get('event_id')
+        if event_id:
+            return QuoteRequest.objects.filter(
+                user=self.request.user, 
+                source_event_id=event_id
+            ).order_by('-created_at')
+        return QuoteRequest.objects.filter(
+            user=self.request.user, 
+            source_event__isnull=False
+        ).order_by('-created_at')
+    
+    def list(self, request, *args, **kwargs):
+        """List quote requests with error handling"""
+        try:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error listing quote requests: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response([], status=status.HTTP_200_OK)
     
     def perform_create(self, serializer):
-        """Automatically assign the authenticated user and link to source event if provided"""
-        save_kwargs = {}
+        """Automatically assign the authenticated user and link to source event"""
+        save_kwargs = {'user': self.request.user}
         
-        if self.request.user.is_authenticated:
-            save_kwargs['user'] = self.request.user
-        else:
-            # Force use user ID 2 (saiku) for now since authentication isn't working properly
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                user = User.objects.get(id=2)
-                save_kwargs['user'] = user
-            except User.DoesNotExist:
-                pass
+        # Get source_event from multiple possible fields
+        source_event_id = (self.request.data.get('source_event') or 
+                          self.request.data.get('event_id') or 
+                          self.request.data.get('prefilled_event_id'))
         
-        # Link to source event if provided
-        source_event_id = self.request.data.get('source_event')
-        if source_event_id:
-            try:
-                source_event = Event.objects.get(id=source_event_id)
-                save_kwargs['source_event'] = source_event
-            except Event.DoesNotExist:
-                pass
-        else:
-            source_event = None
+        if not source_event_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'source_event': 'Event ID is required to create a quote'})
+        
+        try:
+            source_event = Event.objects.get(id=source_event_id, user=self.request.user)
+            save_kwargs['source_event'] = source_event
+        except Event.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'source_event': 'Event not found or access denied'})
         
         # Generate category-specific data if this is a targeted quote
         quote_type = self.request.data.get('quote_type', 'comprehensive')
@@ -1517,14 +1484,12 @@ from django.utils import timezone
 class RSVPViewSet(viewsets.ModelViewSet):
     queryset = RSVP.objects.all().order_by('-created_at')
     serializer_class = RSVPSerializer
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     
     def get_queryset(self):
-        """Filter RSVPs by authenticated user"""
-        if self.request.user.is_authenticated:
-            return RSVP.objects.filter(user=self.request.user).order_by('-created_at')
-        # For unauthenticated requests, filter by user ID 2 (saiku)
-        return RSVP.objects.filter(user_id=2).order_by('-created_at')
+        """Filter RSVPs by authenticated user only"""
+        return RSVP.objects.filter(user=self.request.user).order_by('-created_at')
     
     def perform_create(self, serializer):
         """Generate unique invitation code and assign user"""

@@ -99,18 +99,31 @@ export default function SignupPage() {
         return;
       }
       
-      // User registered but not logged in - no need to store auth data
-      
-      if (userType === 'vendor') {
-        alert('Vendor registration successful! Please login with your credentials.');
+      // Store tokens in Zustand for vendor
+      if (userType === 'vendor' && data.access) {
+        const authStorage = {
+          state: {
+            user: data.vendor,
+            tokens: {
+              access: data.access,
+              refresh: data.refresh
+            },
+            isAuthenticated: true
+          },
+          version: 0
+        };
+        localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+        
+        alert('Vendor registration successful! Complete your profile.');
+        navigate('/vendor/onboarding', { replace: true });
       } else {
         alert('Registration successful! Please login with your credentials.');
+        setTimeout(() => {
+          navigate('/login');
+        }, 1000);
       }
-      
-      // Redirect to login page after signup
-      setTimeout(() => {
-        navigate('/login');
-      }, 1000);
     } catch (error: any) {
       console.error('Registration error:', error);
       alert("Registration failed. Please try again.");

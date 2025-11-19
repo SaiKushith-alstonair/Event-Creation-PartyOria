@@ -9,7 +9,6 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
 from authentication.models import CustomUser
-from vendors.models import VendorAuth
 from .models import Conversation, Message, MessageAttachment, ConversationContext
 from .serializers import ConversationSerializer, MessageSerializer, ConversationCreateSerializer, UserSerializer, MessageAttachmentSerializer
 import jwt
@@ -17,50 +16,16 @@ from django.conf import settings
 import mimetypes
 import os
 
-class VendorTokenAuthentication(BaseAuthentication):
-    """Custom authentication for vendor tokens"""
-    def authenticate(self, request):
-        auth_header = request.META.get('HTTP_AUTHORIZATION')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return None
-        
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            vendor_id = payload.get('vendor_id')
-            if vendor_id:
-                try:
-                    vendor = VendorAuth.objects.select_related('chat_user').get(id=vendor_id)
-                    chat_user = vendor.get_or_create_chat_user()
-                    return (chat_user, token)
-                except VendorAuth.DoesNotExist:
-                    return None
-        except jwt.InvalidTokenError:
-            return None
-        return None
-
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [VendorTokenAuthentication, JWTAuthentication, TokenAuthentication]
+    authentication_classes = [JWTAuthentication, TokenAuthentication]
     
     def get_queryset(self):
         user = self.request.user
-        # Include conversations where user is vendor, customer, or bridged vendor
         query = Q(vendor=user) | Q(customer=user)
-        
-        # If user has vendor_auth (is a bridge user), include conversations for the original vendor
-        if hasattr(user, 'vendor_auth') and user.vendor_auth:
-            original_vendor_conversations = Conversation.objects.filter(
-                vendor__vendor_auth=user.vendor_auth
-            )
-            # Get the vendor IDs from these conversations
-            vendor_ids = original_vendor_conversations.values_list('vendor_id', flat=True)
-            if vendor_ids:
-                query |= Q(vendor_id__in=vendor_ids)
-        
         return Conversation.objects.filter(query).select_related(
-            'vendor', 'customer', 'vendor__vendor_auth', 'customer__vendor_auth'
+            'vendor', 'customer'
         ).prefetch_related('messages').order_by('-last_message_at')
     
     def get_serializer_class(self):
@@ -204,24 +169,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if request.user.is_authenticated:
             current_user = request.user
             if current_user.user_type == 'customer':
-                # Get unique vendors from VendorAuth, not bridge users
-                from vendors.models import VendorAuth
-                vendor_auths = VendorAuth.objects.filter(is_active=True).distinct()
-                
-                # Convert to user format for serializer
-                users_data = []
-                for vendor in vendor_auths:
-                    # Ensure chat user exists
-                    chat_user = vendor.get_or_create_chat_user()
-                    users_data.append({
-                        'id': chat_user.id,
-                        'username': vendor.full_name,
-                        'user_type': 'vendor',
-                        'display_name': vendor.full_name,
-                        'profile_picture': vendor.profile_image.url if vendor.profile_image else None
-                    })
-                
-                return Response(users_data)
+                users = CustomUser.objects.filter(user_type='vendor', is_active=True).distinct()
+                serializer = UserSerializer(users, many=True)
+                return Response(serializer.data)
                 
             elif current_user.user_type == 'vendor':
                 # Get customers (no duplicates here)
@@ -236,7 +186,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 class MessageAttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = MessageAttachmentSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [VendorTokenAuthentication, JWTAuthentication, TokenAuthentication]
+    authentication_classes = [JWTAuthentication, TokenAuthentication]
     
     def get_queryset(self):
         user = self.request.user
@@ -249,23 +199,12 @@ class MessageAttachmentViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
-    authentication_classes = [VendorTokenAuthentication, JWTAuthentication, TokenAuthentication]
+    authentication_classes = [JWTAuthentication, TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser]
     
     def get_queryset(self):
         user = self.request.user
-        # Get conversations user has access to (including bridge users)
         query = Q(vendor=user) | Q(customer=user)
-        
-        # If user has vendor_auth (is a bridge user), include conversations for the original vendor
-        if hasattr(user, 'vendor_auth') and user.vendor_auth:
-            original_vendor_conversations = Conversation.objects.filter(
-                vendor__vendor_auth=user.vendor_auth
-            )
-            vendor_ids = original_vendor_conversations.values_list('vendor_id', flat=True)
-            if vendor_ids:
-                query |= Q(vendor_id__in=vendor_ids)
-        
         accessible_conversations = Conversation.objects.filter(query)
         
         return Message.objects.filter(

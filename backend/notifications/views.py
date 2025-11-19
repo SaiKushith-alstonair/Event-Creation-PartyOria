@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.authentication import TokenAuthentication
-from authentication.vendor_jwt_auth import VendorJWTAuthentication
 from django.db.models import Q
 from .models import Notification, NotificationPreference
 from .serializers import NotificationSerializer, NotificationPreferenceSerializer, MarkAsReadSerializer
@@ -13,7 +12,7 @@ from .services import NotificationService
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = []
-    authentication_classes = [VendorJWTAuthentication, JWTAuthentication, TokenAuthentication]
+    authentication_classes = [JWTAuthentication, TokenAuthentication]
     
     def get_queryset(self):
         if self.request.user.is_authenticated:
@@ -87,7 +86,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 class NotificationPreferenceViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationPreferenceSerializer
     permission_classes = []
-    authentication_classes = [VendorJWTAuthentication, JWTAuthentication, TokenAuthentication]
+    authentication_classes = [JWTAuthentication, TokenAuthentication]
     
     def get_queryset(self):
         if self.request.user.is_authenticated:

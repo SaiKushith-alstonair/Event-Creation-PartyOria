@@ -60,9 +60,20 @@ export const useChat = () => {
 
   // Get auth token with refresh
   const getAuthToken = useCallback(async () => {
-    // Check vendor profile first (vendors)
-    const vendorProfile = localStorage.getItem('vendor_profile');
+    // Try Zustand auth-storage first
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        const token = parsed?.state?.tokens?.access;
+        if (token) return token;
+      } catch (e) {
+        console.error('Failed to parse auth-storage:', e);
+      }
+    }
     
+    // Check vendor profile
+    const vendorProfile = localStorage.getItem('vendor_profile');
     if (vendorProfile) {
       try {
         const vendorData = JSON.parse(vendorProfile);
@@ -74,7 +85,7 @@ export const useChat = () => {
       }
     }
     
-    // Try customer tokens
+    // Fallback to direct localStorage
     let token = localStorage.getItem('access_token') || 
                 localStorage.getItem('authToken') || 
                 localStorage.getItem('token') || 
@@ -82,14 +93,31 @@ export const useChat = () => {
                 sessionStorage.getItem('authToken') ||
                 sessionStorage.getItem('token');
     
-
-    
     return token;
   }, []);
 
   // Get current user
   const getCurrentUser = useCallback((): User | null => {
-    // Try vendor_profile first (vendors)
+    // Try Zustand auth-storage first
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        const user = parsed?.state?.user;
+        if (user) {
+          return {
+            id: user.chat_user_id || user.id,
+            username: user.full_name || user.username || user.email,
+            user_type: user.user_type || 'customer',
+            profile_picture: user.profile_picture
+          };
+        }
+      } catch (e) {
+        console.error('Failed to parse auth-storage:', e);
+      }
+    }
+    
+    // Try vendor_profile (vendors)
     let userStr = localStorage.getItem('vendor_profile') || 
                   sessionStorage.getItem('vendor_profile');
     
@@ -219,14 +247,33 @@ export const useChat = () => {
           updatedMessage.status = 'delivered';
         }
         
+        // Update conversation list - move to top and update unread count
+        const updatedConversations = prev.conversations.map(conv => {
+          if (conv.id === message.conversation_id) {
+            return {
+              ...conv,
+              last_message_at: message.created_at,
+              unread_count: message.sender_id !== prev.currentUser?.id 
+                ? (conv.unread_count || 0) + 1 
+                : conv.unread_count
+            };
+          }
+          return conv;
+        }).sort((a, b) => {
+          const aTime = new Date(a.last_message_at || a.created_at).getTime();
+          const bTime = new Date(b.last_message_at || b.created_at).getTime();
+          return bTime - aTime;
+        });
+        
         return {
           ...prev,
+          conversations: updatedConversations,
           messages: {
             ...prev.messages,
             [message.conversation_id]: [
               ...existingMessages,
               updatedMessage
-            ].slice(-100) // Keep only last 100 messages in memory
+            ].slice(-100)
           }
         };
       });

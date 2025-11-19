@@ -11,11 +11,6 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children, fallback }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simply check if user has valid tokens without auto-login
-    const hasTokens = tokens?.access || 
-                     localStorage.getItem('access_token') ||
-                     sessionStorage.getItem('access_token');
-    
     setIsLoading(false);
   }, [isAuthenticated, tokens]);
 
@@ -30,14 +25,14 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children, fallback }) => {
     );
   }
 
-  if (!isAuthenticated && !tokens?.access) {
+  if (!isAuthenticated) {
     return fallback || (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
           <p className="text-gray-600 mb-4">Please log in to access this page.</p>
           <button
-            onClick={() => window.location.href = '/test-login'}
+            onClick={() => window.location.href = '/login'}
             className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
           >
             Go to Login

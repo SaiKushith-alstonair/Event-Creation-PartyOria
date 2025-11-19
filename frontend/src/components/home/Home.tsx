@@ -46,8 +46,9 @@ export default function Home({ onStartEventCreation }: HomeProps) {
     localStorage.removeItem('vendorOnboarding');
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('auth-storage');
     setUserLoggedIn(false);
-    window.location.reload();
+    navigate('/login');
   };
 
   const handleDashboard = () => {

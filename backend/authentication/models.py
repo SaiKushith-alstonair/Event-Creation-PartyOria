@@ -40,6 +40,15 @@ class CustomUser(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Vendor-specific fields
+    business = models.CharField(max_length=100, blank=True, null=True)
+    experience_level = models.CharField(max_length=50, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    pincode = models.CharField(max_length=10, blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
+    onboarding_completed = models.BooleanField(default=False)
+    
 
 
     def __str__(self):
