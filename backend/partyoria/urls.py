@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .health_checks import health_check, readiness_check, liveness_check
+from events.contact_views import contact_inquiry
 
 # FIXED: Proper URL routing with no conflicts
 urlpatterns = [
@@ -23,6 +24,9 @@ urlpatterns = [
     
     # Notifications API (protected)
     path('api/', include('notifications.urls')),
+    
+    # Contact form (public)
+    path('api/contact/', contact_inquiry, name='contact_inquiry'),
     
     # Health checks (public)
     path('health/', health_check, name='health_check'),

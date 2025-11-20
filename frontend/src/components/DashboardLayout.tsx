@@ -210,10 +210,8 @@ const DashboardLayout: React.FC = () => {
           </div>
         );
       case 'browse-vendors':
-        return <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Browse Vendors</h2>
-          <p className="text-gray-600">Find the perfect vendors for your events.</p>
-        </div>;
+        navigate('/vendors');
+        return null;
       case 'budget-analytics':
         return <BudgetAnalytics />;
       case 'budget-dashboard':

@@ -403,6 +403,15 @@ onClick={onClose}
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Button 
+                      onClick={() => window.location.href = `/vendor-marketplace?price_range=0-${budgetSummary.event.total_budget}&eventId=${event.id}`}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-2 font-semibold shadow-lg transition-all duration-200"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      🎯 Find Vendors
+                    </Button>
+                    <Button 
                       variant="outline" 
                       onClick={() => setShowEditor(true)}
                       className="px-4 py-2 border-2 border-purple-300 hover:border-purple-500 hover:text-purple-600 font-semibold transition-all duration-200"
@@ -564,6 +573,38 @@ onClick={onClose}
                             </div>
                           </div>
                         )}
+
+                        {/* View Vendors Button */}
+                        <div className="mt-4 pt-4 border-t border-purple-200">
+                          <Button 
+                            onClick={() => {
+                              const categoryMap: Record<string, string> = {
+                                'catering': 'Catering',
+                                'photography': 'Photography',
+                                'videography': 'Videography',
+                                'decorations': 'Decoration',
+                                'decoration': 'Decoration',
+                                'entertainment': 'DJ',
+                                'music_dj': 'DJ',
+                                'dj': 'DJ',
+                                'beauty_services': 'Makeup Artist',
+                                'makeup': 'Makeup Artist',
+                                'event_coordination': 'Event Manager',
+                                'flowers': 'Florist',
+                                'florist': 'Florist'
+                              };
+                              const vendorCategory = categoryMap[allocation.category.toLowerCase()] || allocation.category;
+                              const budgetAmount = Number(allocation.amount);
+                              window.location.href = `/vendor-marketplace?category=${vendorCategory}&price_range=0-${budgetAmount}&eventId=${event.id}`;
+                            }}
+                            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            View Available Vendors
+                          </Button>
+                        </div>
 
                         {/* Enhanced Cost Breakdown */}
                         <div className="mt-4 pt-4 border-t border-purple-200">

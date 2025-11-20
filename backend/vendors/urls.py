@@ -1,13 +1,16 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import VenueViewSet
-from . import auth_views, dashboard_views
+from . import auth_views, dashboard_views, marketplace_views
 from events.quote_views import vendor_quote_requests, quote_request_detail, submit_quote
 
 router = DefaultRouter()
 router.register(r'venues', VenueViewSet, basename='venue')
 
 urlpatterns = [
+    # Customer-facing marketplace
+    path('marketplace/', marketplace_views.vendor_marketplace, name='vendor-marketplace'),
+    
     # Vendor authentication
     path('auth/register/', auth_views.VendorRegisterView.as_view(), name='vendor-register'),
     path('auth/login/', auth_views.VendorLoginView.as_view(), name='vendor-login'),

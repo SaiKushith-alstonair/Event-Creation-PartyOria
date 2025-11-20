@@ -282,6 +282,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@partyoria.com')
+CONTACT_EMAIL = config('CONTACT_EMAIL', default='contact@partyoria.com')
+
 # Comprehensive Logging Configuration
 from .logging_config import setup_logging
 LOGGING = setup_logging(BASE_DIR)

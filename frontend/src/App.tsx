@@ -19,6 +19,7 @@ import DashboardLayout from './components/DashboardLayout';
 const RSVPResponse = lazy(() => import('./components/RSVPResponse'));
 const VendorApp = lazy(() => import('./vendor/App'));
 const TestLogin = lazy(() => import('./components/TestLogin'));
+const VendorMarketplace = lazy(() => import('./components/marketplace/VendorMarketplace'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -117,10 +118,10 @@ function AppContent() {
   };
 
   const handleBackToHome = () => {
-    navigate('/');
     setSelectedSection(null);
     setSelectedSubsection(null);
     setEditEventId(undefined);
+    navigate('/', { replace: true });
   };
 
   const handleEventsBack = () => {
@@ -129,7 +130,7 @@ function AppContent() {
     } else if (selectedSection) {
       setSelectedSection(null);
     } else {
-      navigate('/');
+      navigate('/', { replace: true });
     }
   };
 
@@ -143,7 +144,7 @@ function AppContent() {
   const handleStartEventCreation = () => {
     setSelectedSection(null);
     setSelectedSubsection(null);
-    navigate('/landing', { replace: false });
+    navigate('/landing');
   };
 
 
@@ -221,6 +222,7 @@ function AppContent() {
             <Navigate to="/dashboard" replace />
           </RouteGuard>
         } />
+        <Route path="/vendor-marketplace" element={<VendorMarketplace />} />
         <Route path="/vendor/*" element={
           <RouteGuard requireAuth={true} requireVendor={true}>
             <VendorApp />

@@ -275,6 +275,37 @@ class SecureApiService {
     return this.secureRequest<any[]>('/events/images/', {}, true);
   }
   
+  // Vendor operations
+  async getVendors(filters?: any): Promise<any> {
+    const params = new URLSearchParams();
+    if (filters?.category) params.append('category', String(filters.category));
+    if (filters?.location) params.append('location', String(filters.location));
+    if (filters?.search) params.append('search', String(filters.search));
+    if (filters?.price_range) params.append('price_range', String(filters.price_range));
+    if (filters?.limit) params.append('limit', String(Math.min(filters.limit, 200)));
+    
+    const queryString = params.toString();
+    const endpoint = `/vendor/marketplace/${queryString ? '?' + queryString : ''}`;
+    
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch vendors: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('Vendor fetch error:', error);
+      throw new Error(error?.message || 'Failed to load vendors');
+    }
+  }
+  
   // Authentication endpoints
   async login(email: string, password: string): Promise<any> {
     if (!validateEmail(email)) {

@@ -42,24 +42,25 @@ export default function ContactSection() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsSubmitting(true);
     try {
-      const inquiry = {
-        name: data.name,
-        email: data.email,
-        subject: data.subject,
-        message: data.message,
-        isResolved: false,
-      };
-      
-      // Store inquiry in localStorage
-      const inquiries = JSON.parse(localStorage.getItem('inquiries') || '[]');
-      inquiries.push({ ...inquiry, id: Date.now(), createdAt: new Date().toISOString() });
-      localStorage.setItem('inquiries', JSON.stringify(inquiries));
-      
-      toast({
-        title: "Message sent!",
-        description: "Thank you for contacting us. We'll get back to you soon.",
+      const response = await fetch('http://localhost:8000/api/contact/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       });
-      form.reset();
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Message sent!",
+          description: "Thank you for contacting us. We'll get back to you soon.",
+        });
+        form.reset();
+      } else {
+        throw new Error(result.error || 'Failed to send message');
+      }
     } catch (error) {
       console.error("Error submitting contact form:", error);
       toast({

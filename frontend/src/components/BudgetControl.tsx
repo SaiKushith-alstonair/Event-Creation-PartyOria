@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -12,6 +13,7 @@ interface BudgetControlProps {
 }
 
 export const BudgetControl: React.FC<BudgetControlProps> = ({ event, onClose }) => {
+  const navigate = useNavigate();
   const [showEditor, setShowEditor] = useState(false);
   const [budgetData, setBudgetData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -244,6 +246,12 @@ export const BudgetControl: React.FC<BudgetControlProps> = ({ event, onClose }) 
                   <Button onClick={handleSmartAllocation} disabled={allocating}>
                     {allocating ? 'Regenerating...' : 'Regenerate'}
                   </Button>
+                  <Button 
+                    onClick={() => navigate(`/vendor-marketplace?price_range=0-${budgetData.event.total_budget}&eventId=${event.id}`)}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  >
+                    🎯 Find Vendors
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -253,14 +261,24 @@ export const BudgetControl: React.FC<BudgetControlProps> = ({ event, onClose }) 
               <h3 className="text-lg font-semibold mb-6">Budget Breakdown</h3>
               <div className="space-y-4">
                 {budgetData.allocations.map((allocation: any, index: number) => (
-                  <div key={allocation.category} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div key={allocation.category} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? 'bg-purple-500' : 'bg-pink-500'}`}></div>
                       <span className="font-medium capitalize">{allocation.category.replace('_', ' ')}</span>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold">{formatCurrency(allocation.amount)}</div>
-                      <div className="text-sm text-gray-600">{Number(allocation.percentage).toFixed(1)}%</div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="font-bold">{formatCurrency(allocation.amount)}</div>
+                        <div className="text-sm text-gray-600">{Number(allocation.percentage).toFixed(1)}%</div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/vendor-marketplace?price_range=0-${allocation.amount}&category=${allocation.category}&eventId=${event.id}`)}
+                        className="text-xs"
+                      >
+                        Find Vendors
+                      </Button>
                     </div>
                   </div>
                 ))}
