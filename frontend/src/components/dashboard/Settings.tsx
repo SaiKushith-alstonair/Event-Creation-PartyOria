@@ -63,12 +63,34 @@ export default function Settings() {
 
   const loadUserData = () => {
     try {
+      // Check Zustand auth store first
+      const authStorage = localStorage.getItem('auth-storage')
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          const user = authData?.state?.user
+          if (user) {
+            setProfile({
+              firstName: user.first_name || user.firstName || "",
+              lastName: user.last_name || user.lastName || "",
+              email: user.email || "",
+              phone: user.phone || "",
+              city: user.city || "",
+              state: user.state || "",
+              bio: user.bio || ""
+            })
+            return
+          }
+        } catch (e) {}
+      }
+      
+      // Fallback to old storage
       const userStr = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user')
       if (userStr) {
         const user = JSON.parse(userStr)
         setProfile({
-          firstName: user.firstName || "",
-          lastName: user.lastName || "",
+          firstName: user.firstName || user.first_name || "",
+          lastName: user.lastName || user.last_name || "",
           email: user.email || "",
           phone: user.phone || "",
           city: user.city || "",
@@ -98,10 +120,32 @@ export default function Settings() {
 
   const handleProfileUpdate = () => {
     try {
+      // Update Zustand auth store
+      const authStorage = localStorage.getItem('auth-storage')
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage)
+          if (authData?.state?.user) {
+            authData.state.user = {
+              ...authData.state.user,
+              first_name: profile.firstName,
+              last_name: profile.lastName,
+              email: profile.email,
+              phone: profile.phone,
+              city: profile.city,
+              state: profile.state,
+              bio: profile.bio
+            }
+            localStorage.setItem('auth-storage', JSON.stringify(authData))
+          }
+        } catch (e) {}
+      }
+      
+      // Update old storage for backward compatibility
       const userStr = sessionStorage.getItem('partyoria_user') || localStorage.getItem('partyoria_user')
       if (userStr) {
         const user = JSON.parse(userStr)
-        const updatedUser = { ...user, ...profile }
+        const updatedUser = { ...user, ...profile, firstName: profile.firstName, lastName: profile.lastName }
         sessionStorage.setItem('partyoria_user', JSON.stringify(updatedUser))
         localStorage.setItem('partyoria_user', JSON.stringify(updatedUser))
       }

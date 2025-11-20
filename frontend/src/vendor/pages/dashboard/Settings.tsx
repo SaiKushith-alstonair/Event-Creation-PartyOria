@@ -90,23 +90,37 @@ const Settings = () => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Update profile data in backend
       const profileData = {
         full_name: formData.fullName,
         mobile: formData.mobile,
         business: formData.business,
-        experience_level: formData.level
+        experience_level: formData.level,
+        location: formData.location
       };
       
       const result = await apiService.updateProfile(profileData);
       
       if (result.data && !result.error) {
-        // Update localStorage
         const updatedVendorData = { ...vendorData, ...formData };
         localStorage.setItem("vendorOnboarding", JSON.stringify(updatedVendorData));
         
+        // Reload profile to get fresh data
+        const freshProfile = await apiService.getProfile();
+        if (freshProfile.data) {
+          const profile = freshProfile.data;
+          setFormData({
+            fullName: profile.full_name || "",
+            email: profile.email || "",
+            mobile: profile.mobile || "",
+            business: profile.business || "",
+            level: profile.experience_level || "",
+            location: profile.location || "",
+            bio: "",
+            profilePhoto: profile.profile_image ? (profile.profile_image.startsWith('http') ? profile.profile_image : `http://localhost:8000${profile.profile_image}`) : ""
+          });
+        }
+        
         toast.success("Profile updated successfully!");
-        setTimeout(() => navigate("/vendor/dashboard/profile"), 1000);
       } else {
         toast.error('Failed to update profile');
       }
