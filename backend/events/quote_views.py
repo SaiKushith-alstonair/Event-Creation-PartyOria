@@ -39,8 +39,17 @@ def send_quote_requests(request, event_id):
         # Get event regardless of user for development
         event = get_object_or_404(Event, id=event_id)
         
-        # Get matched vendors based on event requirements
-        matched_vendors, categories = match_vendors_to_event(event)
+        # Check if specific vendor IDs are provided (for marketplace targeted quotes)
+        vendor_ids = request.data.get('vendor_ids', [])
+        additional_message = request.data.get('additional_message', '')
+        
+        if vendor_ids:
+            # Targeted quote request from marketplace
+            matched_vendors = CustomUser.objects.filter(id__in=vendor_ids, user_type='vendor', is_active=True)
+            categories = set()
+        else:
+            # Get matched vendors based on event requirements
+            matched_vendors, categories = match_vendors_to_event(event)
         
         if not matched_vendors:
             return Response({
@@ -84,6 +93,10 @@ def send_quote_requests(request, event_id):
             }
         
         # Create quote request
+        description = event.form_data.get('description', '') if event.form_data else ''
+        if additional_message:
+            description = f"{description}\n\nAdditional Message: {additional_message}" if description else additional_message
+        
         quote_request = QuoteRequest.objects.create(
             event_type=event.event_type,
             event_name=event.event_name,
@@ -95,13 +108,13 @@ def send_quote_requests(request, event_id):
             guest_count=event.attendees or 0,
             budget_range=f"₹{event.total_budget}",
             services=services,
-            description=event.form_data.get('description', '') if event.form_data else '',
+            description=description,
             urgency='medium',
             user=quote_user,
             source_event=event,
             selected_vendors=[f"{v.first_name} {v.last_name}".strip() for v in matched_vendors],
             category_specific_data=vendor_category_map,
-            quote_type='targeted'
+            quote_type='targeted' if vendor_ids else 'comprehensive'
         )
         
         # Send notifications to real vendors

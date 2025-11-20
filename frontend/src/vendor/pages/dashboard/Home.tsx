@@ -275,24 +275,31 @@ const Home = () => {
     mobile: string;
     location: string;
   }>(() => {
-    // Get vendor data from localStorage first
     const storedVendor = localStorage.getItem('vendor_profile');
     if (storedVendor) {
       try {
         const parsed = JSON.parse(storedVendor);
+        const firstName = parsed.first_name || '';
+        const lastName = parsed.last_name || '';
+        let fullName = `${firstName} ${lastName}`.trim();
+        
+        if (!fullName) {
+          fullName = parsed.full_name || parsed.name || parsed.email?.split('@')[0] || 'Vendor';
+        }
+        
         return {
-          fullName: parsed.full_name || 'Professional Vendor',
+          fullName: fullName,
           business: parsed.business || 'Photography',
           email: parsed.email || 'vendor@example.com',
           mobile: parsed.mobile || 'XXXXXXXXXX',
-          location: parsed.location || 'Location'
+          location: parsed.location || parsed.city || 'Location'
         };
       } catch (e) {
         console.error('Error parsing stored vendor data:', e);
       }
     }
     return {
-      fullName: 'Professional Vendor',
+      fullName: 'Vendor',
       business: 'Photography',
       email: 'vendor@example.com',
       mobile: 'XXXXXXXXXX',
@@ -304,12 +311,38 @@ const Home = () => {
   const recentActivity = getRecentActivityForCategory(vendorCategory);
 
   useEffect(() => {
-    // Simple initialization without complex async operations
     const status = getVerificationStatus();
     setVerificationStatus(status);
     setLoading(false);
     
-    // Listen for verification status changes
+    // Fetch fresh vendor data from API
+    const fetchVendorData = async () => {
+      try {
+        const result = await apiService.getProfile();
+        if (result?.data) {
+          const firstName = result.data.first_name || '';
+          const lastName = result.data.last_name || '';
+          let fullName = `${firstName} ${lastName}`.trim();
+          
+          if (!fullName) {
+            fullName = result.data.full_name || result.data.email?.split('@')[0] || 'Vendor';
+          }
+          
+          setVendorData({
+            fullName: fullName,
+            business: result.data.business || 'Photography',
+            email: result.data.email || 'vendor@example.com',
+            mobile: result.data.mobile || 'XXXXXXXXXX',
+            location: result.data.location || result.data.city || 'Location'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching vendor data:', error);
+      }
+    };
+    
+    fetchVendorData();
+    
     const handleVerificationStatusChanged = () => {
       const newStatus = getVerificationStatus();
       setVerificationStatus(newStatus);
@@ -368,7 +401,7 @@ const Home = () => {
               <h2 className="text-lg lg:text-2xl font-bold text-white mb-2">
                 🏪 Welcome back, {vendorData.fullName || 'Vendor'}! 👋
               </h2>
-              <p className="text-blue-100 mb-4 text-sm lg:text-base">
+              <p className="text-blue-100 text-sm lg:text-base">
                 Ready to manage your {vendorCategory.toLowerCase()} business today?
               </p>
             </div>

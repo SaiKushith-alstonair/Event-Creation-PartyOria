@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { Dashboard, MyEvents, Messages, Payments, Settings, BudgetAnalytics, QuoteManagement } from './dashboard';
 import QuotesDashboard from './dashboard/QuotesDashboard';
 import RSVPManager from './dashboard/RSVPManager';
+import MyBookings from './dashboard/MyBookings';
 import { BudgetDashboard } from './BudgetDashboard';
 import { BudgetManagement } from './BudgetManagement';
 import RequotePage from './RequotePage';
@@ -67,6 +68,7 @@ const DashboardLayout: React.FC = () => {
   const eventMenuItems = [
     { label: 'Create Event', icon: Plus, component: 'create-event' },
     { label: 'My Events', icon: Calendar, component: 'my-events' },
+    { label: 'My Bookings', icon: UserCheck, component: 'my-bookings' },
     { label: 'Event Timeline', icon: Clock, component: 'event-timeline' },
     { label: 'Budget Analytics', icon: BarChart3, component: 'budget-analytics', action: handleBudgetAnalytics },
     { label: 'Request Quote', icon: FileText, component: 'requote' },
@@ -236,6 +238,8 @@ const DashboardLayout: React.FC = () => {
         return <QuoteManagement onNavigate={setActiveComponent} />;
       case 'rsvp-manager':
         return <RSVPManager onNavigate={setActiveComponent} />;
+      case 'my-bookings':
+        return <MyBookings onNavigate={setActiveComponent} />;
       case 'messages':
         return <Messages />;
       case 'payments':

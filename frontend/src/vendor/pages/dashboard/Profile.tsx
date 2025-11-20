@@ -57,8 +57,12 @@ const Profile = () => {
       try {
         const result = await apiService.getProfile();
         if (result.data) {
+          const firstName = result.data.first_name || '';
+          const lastName = result.data.last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim() || result.data.full_name || 'Professional Vendor';
+          
           setVendorData({
-            fullName: result.data.full_name || 'Professional Vendor',
+            fullName: fullName,
             business: result.data.business || 'Photography',
             email: result.data.email || 'vendor@example.com',
             mobile: result.data.mobile || 'XXXXXXXXXX',

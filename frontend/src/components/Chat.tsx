@@ -143,18 +143,67 @@ export const Chat: React.FC = () => {
       
       if (!token) return;
 
-      const response = await fetch('http://localhost:8000/api/chat/conversations/available_users/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // For customers, only show vendors from bookings
+      if (currentUser?.user_type === 'customer') {
+        console.log('🔍 Loading vendors from bookings for customer:', currentUser.username);
+        const bookingsResponse = await fetch('http://127.0.0.1:8000/api/vendor/bookings/customer/', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.ok) {
-        const users = await response.json();
-        setAvailableUsers(users);
+        console.log('📡 Bookings API response status:', bookingsResponse.status);
+        if (bookingsResponse.ok) {
+          const data = await bookingsResponse.json();
+          console.log('📦 Bookings API data:', data);
+          const bookings = Array.isArray(data) ? data : (data.bookings || data.results || []);
+          console.log('📋 Processed bookings array:', bookings);
+          // Extract unique vendors from bookings
+          const vendorMap = new Map();
+          bookings.forEach((booking: any) => {
+            console.log('Processing booking:', booking);
+            // Handle both nested vendor object and flat vendor fields
+            const vendorId = booking.vendor?.id || booking.vendor_id;
+            const vendorName = booking.vendor?.full_name || booking.vendor_name;
+            const vendorEmail = booking.vendor?.email || booking.vendor_email;
+            const vendorUsername = booking.vendor?.username || booking.vendor_username || vendorEmail?.split('@')[0];
+            const vendorProfilePic = booking.vendor?.profile_picture || booking.vendor_profile_picture;
+            
+            if (vendorId && !vendorMap.has(vendorId)) {
+              vendorMap.set(vendorId, {
+                id: vendorId,
+                username: vendorUsername || vendorEmail,
+                user_type: 'vendor',
+                display_name: vendorName || vendorUsername,
+                profile_picture: vendorProfilePic
+              });
+            }
+          });
+          const vendors = Array.from(vendorMap.values());
+          console.log('✅ Extracted vendors for chat:', vendors);
+          console.log('📊 Total vendors available:', vendors.length);
+          vendors.forEach(v => console.log(`  - ID: ${v.id}, Username: ${v.username}, Display: ${v.display_name}, Type: ${v.user_type}`));
+          setAvailableUsers(vendors);
+        } else {
+          console.error('Bookings fetch failed:', bookingsResponse.status);
+          setAvailableUsers([]);
+        }
       } else {
-        console.error('Failed to load users:', response.status, await response.text());
+        // For vendors, show all available users
+        const response = await fetch('http://localhost:8000/api/chat/conversations/available_users/', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const users = await response.json();
+          setAvailableUsers(users);
+        } else {
+          console.error('Failed to load users:', response.status, await response.text());
+        }
       }
     } catch (error) {
       console.error('Error loading users:', error);
@@ -456,7 +505,11 @@ export const Chat: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowUserList(!showUserList)}
+                  onClick={() => {
+                    console.log('🔄 Toggling user list. Current:', showUserList, '→ New:', !showUserList);
+                    console.log('📋 Available users:', availableUsers);
+                    setShowUserList(!showUserList);
+                  }}
                 >
                   <Users className="h-4 w-4" />
                 </Button>
@@ -626,9 +679,10 @@ export const Chat: React.FC = () => {
                   </div>
                 ) : (
                   conversationMessages.map(message => {
-                    // Use consistent sender identification
-                    const isOwnMessage = message.sender_username === currentUser?.username || 
-                                        message.sender_id === currentUser?.id;
+                    // Use consistent sender identification - check sender field first
+                    const isOwnMessage = message.sender === currentUser?.id || 
+                                        message.sender_id === currentUser?.id || 
+                                        message.sender_username === currentUser?.username;
                     
                     return (
                       <div

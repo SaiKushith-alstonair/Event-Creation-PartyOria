@@ -15,18 +15,7 @@ import { NotificationBell } from "../../../components/NotificationBell";
 
 const Topbar = () => {
   const navigate = useNavigate();
-  const vendorData = (() => {
-    const stored = localStorage.getItem("vendor_profile") || localStorage.getItem("vendorOnboarding") || "{}";
-    try {
-      const parsed = JSON.parse(stored);
-      return {
-        fullName: parsed.full_name || parsed.fullName || 'Vendor',
-        business: parsed.business || 'Professional'
-      };
-    } catch (e) {
-      return { fullName: 'Vendor', business: 'Professional' };
-    }
-  })();
+  const [vendorData, setVendorData] = useState({ fullName: 'Vendor', business: 'Professional' });
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -36,6 +25,34 @@ const Topbar = () => {
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const loadVendorData = () => {
+      const stored = localStorage.getItem("vendor_profile") || localStorage.getItem("vendorOnboarding") || "{}";
+      try {
+        const parsed = JSON.parse(stored);
+        const firstName = parsed.first_name || '';
+        const lastName = parsed.last_name || '';
+        let fullName = `${firstName} ${lastName}`.trim();
+        
+        if (!fullName) {
+          fullName = parsed.full_name || parsed.email?.split('@')[0] || 'Vendor';
+        }
+        
+        setVendorData({
+          fullName: fullName,
+          business: parsed.business || 'Professional'
+        });
+      } catch (e) {
+        setVendorData({ fullName: 'Vendor', business: 'Professional' });
+      }
+    };
+    
+    loadVendorData();
+    
+    const interval = setInterval(loadVendorData, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {

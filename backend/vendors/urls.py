@@ -29,6 +29,9 @@ urlpatterns = [
     path('quote-requests/<int:quote_id>/', quote_request_detail, name='quote-request-detail'),
     path('quotes/<int:quote_id>/submit/', submit_quote, name='submit-quote'),
     
+    # Booking Management
+    path('bookings/', include('vendors.booking_urls')),
+    
     # Existing vendor endpoints
     path('', include(router.urls)),
 ]

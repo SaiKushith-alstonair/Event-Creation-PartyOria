@@ -105,7 +105,7 @@ const Services = () => {
   let selectedServices: string[] = [];
   
   try {
-    const storedData = localStorage.getItem("vendorOnboarding");
+    const storedData = localStorage.getItem("vendor_profile") || localStorage.getItem("vendorOnboarding");
     vendorData = storedData ? JSON.parse(storedData) : {};
     vendorProfession = vendorData?.business || "Photography";
     
@@ -252,17 +252,37 @@ const Services = () => {
     const loadServices = async () => {
       try {
         setIsLoading(true);
-        const token = localStorage.getItem('access_token');
+        
+        // Check both localStorage locations for token
+        let token = localStorage.getItem('access_token');
+        
+        // Also check Zustand auth-storage
+        if (!token) {
+          const authStorage = localStorage.getItem('auth-storage');
+          if (authStorage) {
+            try {
+              const parsed = JSON.parse(authStorage);
+              token = parsed?.state?.tokens?.access;
+            } catch (e) {
+              console.error('Failed to parse auth-storage:', e);
+            }
+          }
+        }
+        
+        console.log('Loading services... Token exists:', !!token);
         
         if (!token) {
+          console.log('No token, setting empty services');
           setServices([]);
           setIsLoading(false);
           return;
         }
         
         const result = await apiService.getServices();
+        console.log('Services API result:', result);
         
         if (result?.error) {
+          console.log('API returned error:', result.error);
           if (Array.isArray(selectedServices) && selectedServices.length > 0) {
             const servicesToCreate = selectedServices.map((serviceName: string) => ({
               id: null,
@@ -278,7 +298,9 @@ const Services = () => {
           return;
         }
         
-        const servicesArray = result?.data?.results || result?.data;
+        // Backend returns array directly, not wrapped in results
+        const servicesArray = Array.isArray(result?.data) ? result.data : (result?.data?.results || []);
+        console.log('Services array:', servicesArray);
         
         if (Array.isArray(servicesArray) && servicesArray.length > 0) {
           const backendServices = servicesArray.map((service: any) => {

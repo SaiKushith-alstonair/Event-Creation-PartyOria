@@ -23,7 +23,8 @@ import {
   MessageCircle,
   CheckCircle,
   User,
-  DollarSign
+  DollarSign,
+  FileText
 } from "lucide-react";
 import { secureApiService } from "../../services/secureApi";
 import { toast } from "sonner";
@@ -227,6 +228,8 @@ const VendorMarketplace = () => {
   const [selectedService, setSelectedService] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [cart, setCart] = useState([]);
+  const [eventData, setEventData] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(false);
   
   // Get price_range, category and eventId from URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -234,8 +237,11 @@ const VendorMarketplace = () => {
   const eventIdFromUrl = urlParams.get('eventId');
   const categoryFromUrl = urlParams.get('category');
   
+  // Normalize category - remove "Services" suffix and trim
+  const normalizedCategory = categoryFromUrl ? categoryFromUrl.replace(/\s+Services$/i, '').trim() : "All";
+  
   const [filters, setFilters] = useState({
-    category: categoryFromUrl || "All",
+    category: normalizedCategory,
     location: "All",
     search: "",
     sortBy: "relevance",
@@ -265,6 +271,9 @@ const VendorMarketplace = () => {
     fetchFilteredVendors();
     loadFavorites();
     loadCart();
+    if (eventIdFromUrl) {
+      fetchEventData();
+    }
   }, []);
 
   useEffect(() => {
@@ -354,17 +363,8 @@ const VendorMarketplace = () => {
         }
       }
       
-      // Price range filter
-      if (filters.priceRange !== "all") {
-        const [minPrice, maxPrice] = filters.priceRange.split('-').map(Number);
-        const vendorPrice = calculateTotalPrice(vendor.services);
-        
-        if (vendorPrice > 0) {
-          if (vendorPrice < minPrice || vendorPrice > maxPrice) {
-            return false;
-          }
-        }
-      }
+      // Price range filter - backend already handles this, skip client-side filtering
+      // to avoid double-filtering that removes valid results
       
       return true;
     });
@@ -399,7 +399,7 @@ const VendorMarketplace = () => {
     const total = calculateTotalPrice(vendor?.services);
     if (total === 0) return 'Contact for pricing';
     if (vendor?.business === 'Catering') {
-      return `₹${total.toLocaleString()}/person`;
+      return `₹${total.toLocaleString()}/person (for all items)`;
     }
     return `₹${total.toLocaleString()}`;
   };
@@ -412,6 +412,44 @@ const VendorMarketplace = () => {
   const loadCart = () => {
     const saved = localStorage.getItem('vendor_cart');
     if (saved) setCart(JSON.parse(saved));
+  };
+
+  const fetchEventData = async () => {
+    if (!eventIdFromUrl) return;
+    
+    try {
+      setLoadingEvent(true);
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      const response = await fetch(`http://localhost:8000/api/events/${eventIdFromUrl}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const event = await response.json();
+        setEventData(event);
+        
+        // Auto-fill booking form with event data
+        setBookingForm({
+          customerName: event.form_data?.clientName || '',
+          customerEmail: event.form_data?.clientEmail || '',
+          customerPhone: event.form_data?.clientPhone || '',
+          eventDate: event.form_data?.dateTime?.split('T')[0] || '',
+          eventType: event.event_name || '',
+          guestCount: event.attendees?.toString() || '',
+          location: event.form_data?.city && event.form_data?.state 
+            ? `${event.form_data.city}, ${event.form_data.state}` 
+            : '',
+          message: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching event data:', error);
+    } finally {
+      setLoadingEvent(false);
+    }
   };
 
   const toggleFavorite = (vendor) => {
@@ -477,28 +515,47 @@ const VendorMarketplace = () => {
   };
 
   const submitBooking = async () => {
-    try {
-      const bookingData = {
-        vendor_id: selectedVendor.id,
-        customer_name: bookingForm.customerName,
-        service_type: bookingForm.eventType,
-        event_date: bookingForm.eventDate,
-        amount: calculateTotalPrice(selectedVendor.services),
-        description: bookingForm.message,
-        location: bookingForm.location
-      };
+    if (!eventIdFromUrl) {
+      toast.error('Event ID not found. Please navigate from budget allocation.');
+      return;
+    }
 
-      // Here you would call your booking API
-      // const result = await apiService.createBooking(bookingData);
-      
-      toast.success('Booking request sent successfully!');
-      setShowBookingDialog(false);
-      setBookingForm({
-        eventDate: "", eventType: "", guestCount: "", budget: "", 
-        location: "", message: "", customerName: "", customerEmail: "", customerPhone: ""
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      if (!token) {
+        toast.error('Please login to send quote requests');
+        return;
+      }
+
+      // Send quote request to specific vendor using existing backend API
+      const response = await fetch(`http://localhost:8000/api/events/${eventIdFromUrl}/send-quotes/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          vendor_ids: [selectedVendor.id],
+          additional_message: bookingForm.message
+        })
       });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`Quote request sent to ${selectedVendor.full_name}!`);
+        setShowBookingDialog(false);
+        
+        // Redirect to quote management page
+        setTimeout(() => {
+          window.location.href = `/dashboard?tab=quotes&eventId=${eventIdFromUrl}`;
+        }, 1000);
+      } else {
+        toast.error(result.message || 'Failed to send quote request');
+      }
     } catch (error) {
-      toast.error('Failed to submit booking');
+      console.error('Error sending quote request:', error);
+      toast.error('Failed to send quote request. Please try again.');
     }
   };
 
@@ -699,24 +756,38 @@ const VendorMarketplace = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-4">
+                  <div className="space-y-2 pt-4">
                     <Button 
-                      className="flex-1" 
+                      className="w-full" 
                       size="sm"
-                      onClick={() => handleViewProfile(vendor)}
+                      onClick={() => {
+                        setSelectedVendor(vendor);
+                        setShowBookingDialog(true);
+                      }}
                     >
-                      <User className="w-4 h-4 mr-2" />
-                      View Profile
+                      <FileText className="w-4 h-4 mr-2" />
+                      Request Quote
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleContactVendor(vendor)}
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Contact
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline"
+                        className="flex-1" 
+                        size="sm"
+                        onClick={() => handleViewProfile(vendor)}
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Profile
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleContactVendor(vendor)}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Contact
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -912,6 +983,144 @@ const VendorMarketplace = () => {
                   onClick={() => handleContactVendor(selectedService.vendor)}
                 >
                   Contact
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Booking/Quote Request Dialog */}
+      <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>Request Quote from {selectedVendor?.full_name}</DialogTitle>
+          </DialogHeader>
+          
+          {selectedVendor && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <img 
+                  src={selectedVendor?.profile_image ? (selectedVendor.profile_image.startsWith('http') ? selectedVendor.profile_image : `http://localhost:8000${selectedVendor.profile_image}`) : getDefaultImage(selectedVendor?.business)} 
+                  alt={selectedVendor?.full_name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                <div>
+                  <h3 className="font-medium">{selectedVendor?.full_name}</h3>
+                  <p className="text-sm text-gray-600">{selectedVendor?.business}</p>
+                  <p className="text-sm font-semibold text-green-600">{formatPrice(selectedVendor)}</p>
+                </div>
+              </div>
+              
+              {eventData && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-800 text-sm font-medium flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Event details auto-filled from your event
+                  </p>
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Your Name</label>
+                  <Input 
+                    placeholder="Enter your name" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.customerName}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input 
+                    type="email" 
+                    placeholder="Enter your email" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.customerEmail}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Phone</label>
+                  <Input 
+                    type="tel" 
+                    placeholder="Enter your phone" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.customerPhone}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Event Date</label>
+                  <Input 
+                    type="date" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.eventDate}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Event Type</label>
+                  <Input 
+                    placeholder="Wedding, Birthday, Corporate, etc." 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.eventType}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Guest Count</label>
+                  <Input 
+                    type="number" 
+                    placeholder="Number of guests" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.guestCount}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Location</label>
+                  <Input 
+                    placeholder="Event location" 
+                    className="mt-1 bg-gray-50"
+                    value={bookingForm.location}
+                    readOnly
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Additional Details (Optional)</label>
+                  <Textarea 
+                    placeholder="Any specific requirements or questions for the vendor..." 
+                    className="mt-1 min-h-[100px] border-2 border-gray-300 focus:border-purple-500"
+                    value={bookingForm.message}
+                    onChange={(e) => setBookingForm({...bookingForm, message: e.target.value})}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">This is the only field you can edit. All other details are from your event.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 pt-4 border-t">
+                <Button 
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3"
+                  onClick={submitBooking}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Send Quote Request
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowBookingDialog(false)}
+                  className="px-6 py-3 border-2"
+                >
+                  Cancel
                 </Button>
               </div>
             </div>

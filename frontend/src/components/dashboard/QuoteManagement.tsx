@@ -7,6 +7,7 @@ import { FileText, Clock, Users, MapPin, Calendar, Eye, TrendingUp, CheckCircle,
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { toast } from "@/components/ui/use-toast"
+import { bookingApi } from "@/services/bookingApi"
 
 interface QuoteManagementProps {
   eventId?: number
@@ -689,11 +690,22 @@ export default function QuoteManagement({ eventId, onNavigate }: QuoteManagement
                             <Button 
                               size="sm" 
                               className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => {
-                                toast({
-                                  title: "Quote Accepted!",
-                                  description: `You've accepted ${vendorName}'s quote of ₹${response.quote_amount?.toLocaleString()}`,
-                                })
+                              onClick={async () => {
+                                try {
+                                  const result = await bookingApi.createBooking(selectedQuote.id, vendorName)
+                                  toast({
+                                    title: "Booking Created!",
+                                    description: `Booking #${result.booking_id} created. Waiting for vendor confirmation.`,
+                                  })
+                                  await loadQuotes()
+                                  setIsDetailModalOpen(false)
+                                } catch (error: any) {
+                                  toast({
+                                    title: "Error",
+                                    description: error.message || "Failed to create booking",
+                                    variant: "destructive"
+                                  })
+                                }
                               }}
                             >
                               ✅ Accept Quote

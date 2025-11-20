@@ -304,7 +304,10 @@ export const useChat = () => {
     });
 
     socket.current.on('error', (error) => {
-      console.error('Socket error:', error);
+      // Only log actual errors, not empty objects
+      if (error && Object.keys(error).length > 0) {
+        console.error('Socket error:', error);
+      }
     });
 
   }, [getAuthToken, getCurrentUser]);
@@ -367,7 +370,10 @@ export const useChat = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const messages = data.results || [];
+        const messages = (data.results || []).map((msg: any) => ({
+          ...msg,
+          conversation_id: msg.conversation || msg.conversation_id
+        }));
         
         setState(prev => ({
           ...prev,
